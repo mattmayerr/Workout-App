@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - Workout Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="login-body">
+    <main class="login-shell">
+      <section class="login-hero">
+        <p class="eyebrow">Workout Tracker</p>
+        <h1>Track your workouts from anywhere.</h1>
+        <p class="subtitle">
+          Create an account or sign in to sync your workout history, dashboard, and progress
+          across devices.
+        </p>
+      </section>
+
+      <section class="auth-card login-card" aria-live="polite">
+        <div>
+          <p class="eyebrow">Account</p>
+          <h2 id="auth-title">Sign in</h2>
+          <p id="auth-description" class="muted">
+            Use the email and password connected to your workout tracker account.
+          </p>
+        </div>
+
+        <p id="auth-message" class="message" hidden></p>
+
+        <form id="auth-form">
+          <div class="field">
+            <label for="auth-email">Email</label>
+            <input id="auth-email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="auth-password">Password</label>
+            <input
+              id="auth-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              minlength="6"
+              required
+            />
+          </div>
+          <div class="auth-actions">
+            <button id="auth-submit" class="button" type="submit">Sign in</button>
+            <button id="auth-toggle" class="button-secondary" type="button">
+              Create an account instead
+            </button>
+          </div>
+        </form>
+
+        <a class="muted-link" href="index.html">Back to tracker</a>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="auth.js"></script>
+  </body>
+</html>

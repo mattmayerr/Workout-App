@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workout Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Workout Tracker</p>
+        <h1>Build the physique by showing up.</h1>
+        <p class="subtitle">
+          Track the four-day upper/lower routine, watch your volume and strength trends,
+          and keep the plan simple enough to repeat.
+        </p>
+      </div>
+      <div class="header-card">
+        <span class="header-card__label">Weekly target</span>
+        <strong>4 workouts</strong>
+        <span>60-75 min each</span>
+        <div id="account-status" class="account-status"></div>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <nav class="tabs" aria-label="Workout app navigation">
+        <button class="tab is-active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="log">Log Workout</button>
+        <button class="tab" data-tab="routine">Routine</button>
+        <button class="tab" data-tab="history">History</button>
+      </nav>
+
+      <section id="app" class="panel" aria-live="polite"></section>
+    </main>
+
+    <template id="empty-state-template">
+      <div class="empty-state">
+        <h2>No workouts logged yet</h2>
+        <p>
+          Start with your next scheduled day. Once you save a workout, this dashboard will
+          show consistency, volume, and exercise progress.
+        </p>
+        <button class="button" data-action="go-log">Log your first workout</button>
+      </div>
+    </template>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
