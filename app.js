@@ -2,63 +2,47 @@ const UI_STORAGE_KEY = "workout-tracker-ui-v1";
 
 const routine = [
   {
-    id: "monday-upper",
-    day: "Monday",
-    name: "Upper",
+    id: "push-day",
+    day: "Push",
+    name: "Chest, Shoulders & Triceps",
     time: "60-75 min",
-    totalSets: "~22 sets",
+    totalSets: "~20 sets",
     exercises: [
       { name: "Incline Bench", sets: 4, reps: "6-10", group: "Push" },
-      { name: "Pull-Ups", sets: 4, reps: "6-10", group: "Pull" },
-      { name: "Seated Shoulder Press", sets: 3, reps: "8-12", group: "Push" },
-      { name: "Chest Supported Row", sets: 3, reps: "8-12", group: "Pull" },
+      { name: "Flat Dumbbell Press", sets: 3, reps: "8-12", group: "Push" },
+      { name: "Dumbbell Shoulder Press", sets: 3, reps: "8-12", group: "Push" },
       { name: "Lateral Raises", sets: 4, reps: "12-15", group: "Push" },
-      { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
       { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
     ],
   },
   {
-    id: "tuesday-lower",
-    day: "Tuesday",
-    name: "Lower",
+    id: "pull-day",
+    day: "Pull",
+    name: "Back & Biceps",
+    time: "60-75 min",
+    totalSets: "~20 sets",
+    exercises: [
+      { name: "Weighted Pull-Ups", sets: 4, reps: "6-10", group: "Pull" },
+      { name: "Chest Supported Row", sets: 4, reps: "8-12", group: "Pull" },
+      { name: "Cable Row", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Face Pulls", sets: 3, reps: "12-15", group: "Pull" },
+      { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
+    ],
+  },
+  {
+    id: "legs-day",
+    day: "Legs",
+    name: "Quads, Hamstrings & Calves",
     time: "~60 min",
-    totalSets: "~21 sets",
+    totalSets: "~24 sets",
     exercises: [
       { name: "Squat", sets: 4, reps: "6-10", group: "Legs" },
       { name: "Romanian Deadlift", sets: 4, reps: "8-12", group: "Legs" },
       { name: "Leg Press", sets: 3, reps: "10-15", group: "Legs" },
       { name: "Leg Curl", sets: 3, reps: "10-15", group: "Legs" },
-      { name: "Calf Raises", sets: 4, reps: "15-20", group: "Legs" },
-      { name: "Abs", sets: 3, reps: "10-20", group: "Core" },
-    ],
-  },
-  {
-    id: "thursday-upper",
-    day: "Thursday",
-    name: "Upper",
-    time: "60-75 min",
-    totalSets: "~24 sets",
-    exercises: [
-      { name: "Flat Dumbbell Press", sets: 4, reps: "8-12", group: "Push" },
-      { name: "Weighted Pull-Ups", sets: 4, reps: "6-10", group: "Pull" },
-      { name: "Dumbbell Shoulder Press", sets: 3, reps: "8-12", group: "Push" },
-      { name: "Cable Row", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Lateral Raises", sets: 4, reps: "12-15", group: "Push" },
-      { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
-    ],
-  },
-  {
-    id: "friday-lower",
-    day: "Friday",
-    name: "Lower",
-    time: "~60 min",
-    totalSets: "~20 sets",
-    exercises: [
-      { name: "Deadlift or RDL", sets: 3, reps: "5-8", group: "Legs" },
-      { name: "Hack Squat or Leg Press", sets: 4, reps: "10-15", group: "Legs" },
-      { name: "Walking Lunges", sets: 3, reps: "8-12", group: "Legs" },
-      { name: "Leg Curl", sets: 3, reps: "10-15", group: "Legs" },
+      { name: "Walking Lunges", sets: 3, reps: "10-12", group: "Legs" },
       { name: "Calf Raises", sets: 4, reps: "15-20", group: "Legs" },
       { name: "Abs", sets: 3, reps: "10-20", group: "Core" },
     ],
@@ -491,7 +475,7 @@ function renderDashboard() {
         <h3>Focus Exercises</h3>
         <p class="muted">These are the exercises doing most of the physique-building work in this plan.</p>
         <div class="workout-card__stats">
-          ${["Incline Bench", "Dumbbell Shoulder Press", "Lateral Raises", "Pull-Ups", "Rows", "Face Pulls", "Squats", "Romanian Deadlifts", "Leg Press"]
+          ${["Incline Bench", "Dumbbell Shoulder Press", "Lateral Raises", "Weighted Pull-Ups", "Chest Supported Row", "Face Pulls", "Squat", "Romanian Deadlift", "Leg Press"]
             .map((name) => `<span class="pill">${name}</span>`)
             .join("")}
         </div>
