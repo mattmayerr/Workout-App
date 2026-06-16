@@ -42,7 +42,7 @@ const routine = [
       { name: "Romanian Deadlift", sets: 4, reps: "8-12", group: "Legs" },
       { name: "Leg Press", sets: 3, reps: "10-15", group: "Legs" },
       { name: "Leg Curl", sets: 3, reps: "10-15", group: "Legs" },
-      { name: "Walking Lunges", sets: 3, reps: "10-12", group: "Legs" },
+      { name: "Leg Extension", sets: 3, reps: "12-15", group: "Legs" },
       { name: "Calf Raises", sets: 4, reps: "15-20", group: "Legs" },
       { name: "Abs", sets: 3, reps: "10-20", group: "Core" },
     ],
