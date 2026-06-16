@@ -1,4 +1,5 @@
 const UI_STORAGE_KEY = "workout-tracker-ui-v1";
+const DRAFT_STORAGE_KEY = "workout-tracker-log-draft-v1";
 
 const routine = [
   {
@@ -88,6 +89,39 @@ function saveState() {
   };
 
   localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(uiState));
+}
+
+function loadDraft() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDraftFromForm(form) {
+  if (!form) return;
+  const draft = {};
+  for (const [key, value] of new FormData(form).entries()) {
+    draft[key] = value;
+  }
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_STORAGE_KEY);
+}
+
+function clearExerciseDraftFields() {
+  const draft = loadDraft();
+  for (const key of Object.keys(draft)) {
+    if (key.startsWith("exercise-")) delete draft[key];
+  }
+  localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+}
+
+function getWorkoutForm() {
+  return document.querySelector("#workout-form");
 }
 
 function createSupabaseClient() {
@@ -584,7 +618,12 @@ function renderLineChart(data) {
 }
 
 function renderLog() {
+  const draft = loadDraft();
+  if (draft.routineId && getRoutine(draft.routineId).id === draft.routineId) {
+    state.selectedRoutineId = draft.routineId;
+  }
   const selectedRoutine = getRoutine();
+  const dateValue = draft.date || state.formDate;
 
   app.innerHTML = `
     <div class="section-header">
@@ -599,7 +638,7 @@ function renderLog() {
         <div class="form-grid">
           <div class="field">
             <label for="workout-date">Date</label>
-            <input id="workout-date" name="date" type="date" value="${escapeHtml(state.formDate)}" required />
+            <input id="workout-date" name="date" type="date" value="${escapeHtml(dateValue)}" required />
           </div>
           <div class="field">
             <label for="routine-select">Routine</label>
@@ -614,21 +653,21 @@ function renderLog() {
           </div>
           <div class="field">
             <label for="duration">Duration min</label>
-            <input id="duration" name="duration" type="number" min="1" max="240" placeholder="65" />
+            <input id="duration" name="duration" type="number" min="1" max="240" placeholder="65" value="${escapeHtml(draft.duration || "")}" />
           </div>
           <div class="field">
             <label for="bodyweight">Bodyweight</label>
-            <input id="bodyweight" name="bodyweight" type="number" min="1" step="0.1" placeholder="198" />
+            <input id="bodyweight" name="bodyweight" type="number" min="1" step="0.1" placeholder="198" value="${escapeHtml(draft.bodyweight || "")}" />
           </div>
           <div class="field field--wide">
             <label for="notes">Notes</label>
-            <textarea id="notes" name="notes" placeholder="Energy, sleep, form notes, or what to improve next time"></textarea>
+            <textarea id="notes" name="notes" placeholder="Energy, sleep, form notes, or what to improve next time">${escapeHtml(draft.notes || "")}</textarea>
           </div>
         </div>
       </div>
 
       <div class="exercise-list">
-        ${selectedRoutine.exercises.map(renderExerciseInputCard).join("")}
+        ${selectedRoutine.exercises.map((exercise, index) => renderExerciseInputCard(exercise, index, draft)).join("")}
       </div>
 
       <div class="form-actions">
@@ -639,13 +678,15 @@ function renderLog() {
   `;
 }
 
-function renderExerciseInputCard(exercise, exerciseIndex) {
+function renderExerciseInputCard(exercise, exerciseIndex, draft = {}) {
   const rows = Array.from({ length: exercise.sets }, (_, setIndex) => {
+    const weightName = `exercise-${exerciseIndex}-weight-${setIndex}`;
+    const repsName = `exercise-${exerciseIndex}-reps-${setIndex}`;
     return `
       <tr>
         <td>${setIndex + 1}</td>
-        <td><input name="exercise-${exerciseIndex}-weight-${setIndex}" type="number" min="0" step="0.5" inputmode="decimal" placeholder="lbs" /></td>
-        <td><input name="exercise-${exerciseIndex}-reps-${setIndex}" type="number" min="0" step="1" inputmode="numeric" placeholder="${exercise.reps}" /></td>
+        <td><input name="${weightName}" type="number" min="0" step="0.5" inputmode="decimal" placeholder="lbs" value="${escapeHtml(draft[weightName] || "")}" /></td>
+        <td><input name="${repsName}" type="number" min="0" step="1" inputmode="numeric" placeholder="${exercise.reps}" value="${escapeHtml(draft[repsName] || "")}" /></td>
       </tr>
     `;
   }).join("");
@@ -724,6 +765,7 @@ async function saveWorkout(form) {
   state.workouts = [...state.workouts, rowToWorkout(data)].sort((a, b) => a.date.localeCompare(b.date));
   state.formDate = workout.date;
   state.activeTab = "dashboard";
+  clearDraft();
   saveState();
   render();
 }
@@ -943,6 +985,8 @@ document.addEventListener("change", (event) => {
   const target = event.target;
 
   if (target.matches("[data-action='select-routine']")) {
+    saveDraftFromForm(getWorkoutForm());
+    clearExerciseDraftFields();
     state.selectedRoutineId = target.value;
     saveState();
     renderLog();
@@ -954,6 +998,20 @@ document.addEventListener("change", (event) => {
     render();
   }
 });
+
+document.addEventListener("input", (event) => {
+  const form = event.target.closest?.("#workout-form");
+  if (form) saveDraftFromForm(form);
+});
+
+function persistDraftOnHide() {
+  saveDraftFromForm(getWorkoutForm());
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") persistDraftOnHide();
+});
+window.addEventListener("pagehide", persistDraftOnHide);
 
 document.addEventListener("submit", async (event) => {
   if (event.target.id === "workout-form") {
