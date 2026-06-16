@@ -1,13 +1,12 @@
 const UI_STORAGE_KEY = "workout-tracker-ui-v1";
 const DRAFT_STORAGE_KEY = "workout-tracker-log-draft-v1";
 
-const routine = [
+const DEFAULT_ROUTINE = [
   {
     id: "push-day",
     day: "Push",
     name: "Chest, Shoulders & Triceps",
     time: "60-75 min",
-    totalSets: "~20 sets",
     exercises: [
       { name: "Incline Bench", sets: 4, reps: "6-10", group: "Push" },
       { name: "Flat Dumbbell Press", sets: 3, reps: "8-12", group: "Push" },
@@ -22,7 +21,6 @@ const routine = [
     day: "Pull",
     name: "Back & Biceps",
     time: "60-75 min",
-    totalSets: "~20 sets",
     exercises: [
       { name: "Weighted Pull-Ups", sets: 4, reps: "6-10", group: "Pull" },
       { name: "Chest Supported Row", sets: 4, reps: "8-12", group: "Pull" },
@@ -37,7 +35,6 @@ const routine = [
     day: "Legs",
     name: "Quads, Hamstrings & Calves",
     time: "~60 min",
-    totalSets: "~24 sets",
     exercises: [
       { name: "Squat", sets: 4, reps: "6-10", group: "Legs" },
       { name: "Romanian Deadlift", sets: 4, reps: "8-12", group: "Legs" },
@@ -62,10 +59,12 @@ function loadState() {
   const today = new Date().toISOString().slice(0, 10);
   const defaults = {
     activeTab: "dashboard",
-    selectedRoutineId: routine[0].id,
+    selectedRoutineId: DEFAULT_ROUTINE[0].id,
     selectedExercise: "Incline Bench",
     formDate: today,
     workouts: [],
+    routine: [],
+    routineMessage: "",
     session: null,
     isLoading: true,
     authMessage: "",
@@ -74,7 +73,7 @@ function loadState() {
 
   try {
     const saved = JSON.parse(localStorage.getItem(UI_STORAGE_KEY));
-    return saved ? { ...defaults, ...saved, workouts: [] } : defaults;
+    return saved ? { ...defaults, ...saved, workouts: [], routine: [] } : defaults;
   } catch {
     return defaults;
   }
@@ -170,7 +169,45 @@ function formatDate(value) {
 }
 
 function getRoutine(routineId = state.selectedRoutineId) {
-  return routine.find((item) => item.id === routineId) ?? routine[0];
+  return state.routine.find((item) => item.id === routineId) ?? state.routine[0] ?? null;
+}
+
+function generateId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function cloneDefaultRoutine() {
+  return DEFAULT_ROUTINE.map((day) => ({
+    id: generateId(),
+    day: day.day,
+    name: day.name,
+    time: day.time,
+    exercises: day.exercises.map((exercise) => ({ ...exercise })),
+  }));
+}
+
+function dayTotalSets(day) {
+  const total = day.exercises.reduce((sum, exercise) => sum + Number(exercise.sets || 0), 0);
+  return `~${total} sets`;
+}
+
+const EXERCISE_GROUPS = ["Push", "Pull", "Legs", "Core", "Other"];
+
+function findRoutineDay(dayId) {
+  return state.routine.find((day) => day.id === dayId) ?? null;
+}
+
+function moveArrayItem(items, index, direction) {
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (target < 0 || target >= items.length) return false;
+  [items[index], items[target]] = [items[target], items[index]];
+  return true;
+}
+
+async function commitRoutineChange() {
+  render();
+  await saveRoutine();
 }
 
 function completedSets(workout) {
@@ -198,7 +235,7 @@ function estimatedOneRepMax(weight, reps) {
 }
 
 function getAllExerciseNames() {
-  const routineNames = routine.flatMap((day) => day.exercises.map((exercise) => exercise.name));
+  const routineNames = state.routine.flatMap((day) => day.exercises.map((exercise) => exercise.name));
   const loggedNames = state.workouts.flatMap((workout) =>
     workout.exercises.map((exercise) => exercise.name),
   );
@@ -323,6 +360,8 @@ async function loadWorkouts(showLoading = true) {
     render();
   }
 
+  await loadRoutine();
+
   const { data, error } = await supabaseClient
     .from("workouts")
     .select("*")
@@ -340,6 +379,81 @@ async function loadWorkouts(showLoading = true) {
   }
 
   render();
+}
+
+function normalizeRoutine(days) {
+  if (!Array.isArray(days)) return [];
+  return days
+    .filter((day) => day && typeof day === "object")
+    .map((day) => ({
+      id: day.id || generateId(),
+      day: String(day.day || "Day"),
+      name: String(day.name || ""),
+      time: String(day.time || "60 min"),
+      exercises: Array.isArray(day.exercises)
+        ? day.exercises.map((exercise) => ({
+            name: String(exercise?.name || "Exercise"),
+            sets: Number(exercise?.sets || 0),
+            reps: String(exercise?.reps || ""),
+            group: String(exercise?.group || "Other"),
+          }))
+        : [],
+    }));
+}
+
+function reconcileSelectedRoutine() {
+  if (!state.routine.length) return;
+  const exists = state.routine.some((day) => day.id === state.selectedRoutineId);
+  if (!exists) {
+    state.selectedRoutineId = state.routine[0].id;
+    saveState();
+  }
+}
+
+async function loadRoutine() {
+  if (!supabaseClient || !isSignedIn()) return;
+
+  const { data, error } = await supabaseClient
+    .from("routines")
+    .select("days")
+    .eq("user_id", state.session.user.id)
+    .maybeSingle();
+
+  if (error) {
+    state.routineMessage = error.message;
+    state.routine = cloneDefaultRoutine();
+    reconcileSelectedRoutine();
+    return;
+  }
+
+  if (!data) {
+    state.routine = cloneDefaultRoutine();
+    const { error: seedError } = await supabaseClient
+      .from("routines")
+      .insert({ user_id: state.session.user.id, days: state.routine });
+    state.routineMessage = seedError ? seedError.message : "";
+    reconcileSelectedRoutine();
+    return;
+  }
+
+  const days = normalizeRoutine(data.days);
+  state.routine = days.length ? days : cloneDefaultRoutine();
+  state.routineMessage = "";
+  reconcileSelectedRoutine();
+}
+
+async function saveRoutine() {
+  if (!supabaseClient || !isSignedIn()) return;
+
+  const { error } = await supabaseClient
+    .from("routines")
+    .upsert(
+      { user_id: state.session.user.id, days: state.routine },
+      { onConflict: "user_id" },
+    );
+
+  state.routineMessage = error ? error.message : "";
+  if (error) render();
 }
 
 async function signOut() {
@@ -618,8 +732,26 @@ function renderLineChart(data) {
 }
 
 function renderLog() {
+  if (!state.routine.length) {
+    app.innerHTML = `
+      <div class="section-header">
+        <div>
+          <h2>Log Workout</h2>
+          <p>You don't have any workout days yet.</p>
+        </div>
+        <button class="button" data-action="go-builder">Edit routine</button>
+      </div>
+      <div class="empty-state">
+        <h2>No workout days</h2>
+        <p>Add a workout day in the routine editor, then come back here to log it.</p>
+        <button class="button" data-action="go-builder">Go to routine editor</button>
+      </div>
+    `;
+    return;
+  }
+
   const draft = loadDraft();
-  if (draft.routineId && getRoutine(draft.routineId).id === draft.routineId) {
+  if (draft.routineId && getRoutine(draft.routineId)?.id === draft.routineId) {
     state.selectedRoutineId = draft.routineId;
   }
   const selectedRoutine = getRoutine();
@@ -643,10 +775,10 @@ function renderLog() {
           <div class="field">
             <label for="routine-select">Routine</label>
             <select id="routine-select" name="routineId" data-action="select-routine">
-              ${routine
+              ${state.routine
                 .map(
                   (day) =>
-                    `<option value="${day.id}" ${day.id === selectedRoutine.id ? "selected" : ""}>${day.day} - ${day.name}</option>`,
+                    `<option value="${escapeHtml(day.id)}" ${day.id === selectedRoutine.id ? "selected" : ""}>${escapeHtml(day.day)}${day.name ? ` - ${escapeHtml(day.name)}` : ""}</option>`,
                 )
                 .join("")}
             </select>
@@ -717,6 +849,10 @@ function renderExerciseInputCard(exercise, exerciseIndex, draft = {}) {
 async function saveWorkout(form) {
   const formData = new FormData(form);
   const selectedRoutine = getRoutine(formData.get("routineId"));
+  if (!selectedRoutine) {
+    alert("Add a workout day in the routine editor before logging.");
+    return;
+  }
 
   const exercises = selectedRoutine.exercises
     .map((exercise, exerciseIndex) => {
@@ -775,22 +911,24 @@ function renderRoutine() {
     <div class="section-header">
       <div>
         <h2>The Routine</h2>
-        <p>Four days per week, focused on progressive overload and repeatability.</p>
+        <p>Your current plan. Customize the days and exercises in the routine editor.</p>
       </div>
-      <button class="button" data-action="go-log">Log workout</button>
+      <button class="button" data-action="go-builder">Edit routine</button>
     </div>
 
-    <div class="grid grid--routine">
-      ${routine
+    ${
+      state.routine.length
+        ? `<div class="grid grid--routine">
+      ${state.routine
         .map(
           (day) => `
             <article class="card routine-day">
               <div>
-                <p class="eyebrow">${day.day}</p>
-                <h3>${day.name}</h3>
+                <p class="eyebrow">${escapeHtml(day.day)}</p>
+                <h3>${escapeHtml(day.name)}</h3>
                 <div class="routine-day__meta">
-                  <span class="pill">${day.time}</span>
-                  <span class="pill">${day.totalSets}</span>
+                  <span class="pill">${escapeHtml(day.time)}</span>
+                  <span class="pill">${dayTotalSets(day)}</span>
                 </div>
               </div>
               <ul class="routine-list">
@@ -805,12 +943,113 @@ function renderRoutine() {
                   )
                   .join("")}
               </ul>
-              <button class="button-secondary" data-action="log-specific-routine" data-routine-id="${day.id}">Log ${day.day}</button>
+              <button class="button-secondary" data-action="log-specific-routine" data-routine-id="${escapeHtml(day.id)}">Log ${escapeHtml(day.day)}</button>
             </article>
           `,
         )
         .join("")}
+    </div>`
+        : `<div class="empty-state"><h2>No workout days yet</h2><p>Build your plan in the routine editor.</p><button class="button" data-action="go-builder">Open routine editor</button></div>`
+    }
+  `;
+}
+
+function renderBuilder() {
+  app.innerHTML = `
+    <div class="section-header">
+      <div>
+        <h2>Edit Routine</h2>
+        <p>Add workout days, edit exercises, and reorder them. Changes save to your account automatically.</p>
+      </div>
+      <div class="builder-actions">
+        <button class="button" data-action="builder-add-day">Add workout day</button>
+        <button class="button-secondary" data-action="builder-reset-default">Reset to default</button>
+      </div>
     </div>
+
+    ${state.routineMessage ? renderMessage(state.routineMessage, "error") : ""}
+
+    ${
+      state.routine.length
+        ? `<div class="builder-days">${state.routine.map(renderBuilderDay).join("")}</div>`
+        : `<div class="empty-state"><h2>No workout days</h2><p>Add your first workout day to get started.</p><button class="button" data-action="builder-add-day">Add workout day</button></div>`
+    }
+  `;
+}
+
+function renderBuilderDay(day, dayIndex) {
+  const isFirst = dayIndex === 0;
+  const isLast = dayIndex === state.routine.length - 1;
+
+  return `
+    <article class="card builder-day" data-day-id="${escapeHtml(day.id)}">
+      <div class="builder-day__top">
+        <div class="builder-day__fields">
+          <div class="field">
+            <label>Day label</label>
+            <input type="text" value="${escapeHtml(day.day)}" placeholder="Push"
+              data-action="builder-day-field" data-day-id="${escapeHtml(day.id)}" data-field="day" />
+          </div>
+          <div class="field">
+            <label>Focus / name</label>
+            <input type="text" value="${escapeHtml(day.name)}" placeholder="Chest, Shoulders & Triceps"
+              data-action="builder-day-field" data-day-id="${escapeHtml(day.id)}" data-field="name" />
+          </div>
+          <div class="field">
+            <label>Time</label>
+            <input type="text" value="${escapeHtml(day.time)}" placeholder="60 min"
+              data-action="builder-day-field" data-day-id="${escapeHtml(day.id)}" data-field="time" />
+          </div>
+        </div>
+        <div class="builder-day__controls">
+          <span class="pill">${dayTotalSets(day)}</span>
+          <button class="icon-button" data-action="builder-move-day" data-day-id="${escapeHtml(day.id)}" data-dir="up" ${isFirst ? "disabled" : ""} title="Move day up">&uarr;</button>
+          <button class="icon-button" data-action="builder-move-day" data-day-id="${escapeHtml(day.id)}" data-dir="down" ${isLast ? "disabled" : ""} title="Move day down">&darr;</button>
+          <button class="button-danger" data-action="builder-delete-day" data-day-id="${escapeHtml(day.id)}">Delete day</button>
+        </div>
+      </div>
+
+      ${
+        day.exercises.length
+          ? `<table class="builder-exercises">
+        <thead>
+          <tr><th>Exercise</th><th>Sets</th><th>Reps</th><th>Group</th><th>Order</th></tr>
+        </thead>
+        <tbody>
+          ${day.exercises.map((exercise, exIndex) => renderBuilderExerciseRow(day, exercise, exIndex)).join("")}
+        </tbody>
+      </table>`
+          : `<p class="muted">No exercises yet. Add one below.</p>`
+      }
+
+      <button class="button-secondary" data-action="builder-add-exercise" data-day-id="${escapeHtml(day.id)}">Add exercise</button>
+    </article>
+  `;
+}
+
+function renderBuilderExerciseRow(day, exercise, exIndex) {
+  const isFirst = exIndex === 0;
+  const isLast = exIndex === day.exercises.length - 1;
+
+  return `
+    <tr>
+      <td data-label="Exercise"><input type="text" value="${escapeHtml(exercise.name)}" placeholder="Exercise name"
+        data-action="builder-exercise-field" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" data-field="name" /></td>
+      <td data-label="Sets"><input type="number" min="1" max="20" step="1" value="${escapeHtml(exercise.sets)}"
+        data-action="builder-exercise-field" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" data-field="sets" /></td>
+      <td data-label="Reps"><input type="text" value="${escapeHtml(exercise.reps)}" placeholder="8-12"
+        data-action="builder-exercise-field" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" data-field="reps" /></td>
+      <td data-label="Group">
+        <select data-action="builder-exercise-field" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" data-field="group">
+          ${EXERCISE_GROUPS.map((group) => `<option value="${group}" ${group === exercise.group ? "selected" : ""}>${group}</option>`).join("")}
+        </select>
+      </td>
+      <td data-label="Order" class="builder-exercise__controls">
+        <button class="icon-button" data-action="builder-move-exercise" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" data-dir="up" ${isFirst ? "disabled" : ""} title="Move up">&uarr;</button>
+        <button class="icon-button" data-action="builder-move-exercise" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" data-dir="down" ${isLast ? "disabled" : ""} title="Move down">&darr;</button>
+        <button class="icon-button icon-button--danger" data-action="builder-delete-exercise" data-day-id="${escapeHtml(day.id)}" data-ex-index="${exIndex}" title="Remove exercise">&times;</button>
+      </td>
+    </tr>
   `;
 }
 
@@ -914,6 +1153,7 @@ function render() {
   if (state.activeTab === "dashboard") renderDashboard();
   if (state.activeTab === "log") renderLog();
   if (state.activeTab === "routine") renderRoutine();
+  if (state.activeTab === "builder") renderBuilder();
   if (state.activeTab === "history") renderHistory();
 }
 
@@ -936,6 +1176,69 @@ document.addEventListener("click", async (event) => {
   if (action === "log-specific-routine") {
     state.selectedRoutineId = actionTarget.dataset.routineId;
     setTab("log");
+  }
+
+  if (action === "go-builder") {
+    setTab("builder");
+  }
+
+  if (action === "builder-add-day") {
+    state.routine.push({
+      id: generateId(),
+      day: "New Day",
+      name: "",
+      time: "60 min",
+      exercises: [],
+    });
+    await commitRoutineChange();
+  }
+
+  if (action === "builder-delete-day") {
+    const day = findRoutineDay(actionTarget.dataset.dayId);
+    if (!day) return;
+    if (!confirm(`Delete "${day.day}" and its exercises?`)) return;
+    state.routine = state.routine.filter((item) => item.id !== day.id);
+    reconcileSelectedRoutine();
+    await commitRoutineChange();
+  }
+
+  if (action === "builder-move-day") {
+    const index = state.routine.findIndex((item) => item.id === actionTarget.dataset.dayId);
+    if (index === -1) return;
+    if (moveArrayItem(state.routine, index, actionTarget.dataset.dir)) {
+      await commitRoutineChange();
+    }
+  }
+
+  if (action === "builder-add-exercise") {
+    const day = findRoutineDay(actionTarget.dataset.dayId);
+    if (!day) return;
+    day.exercises.push({ name: "New Exercise", sets: 3, reps: "8-12", group: "Other" });
+    await commitRoutineChange();
+  }
+
+  if (action === "builder-delete-exercise") {
+    const day = findRoutineDay(actionTarget.dataset.dayId);
+    if (!day) return;
+    const exIndex = Number(actionTarget.dataset.exIndex);
+    day.exercises.splice(exIndex, 1);
+    await commitRoutineChange();
+  }
+
+  if (action === "builder-move-exercise") {
+    const day = findRoutineDay(actionTarget.dataset.dayId);
+    if (!day) return;
+    const exIndex = Number(actionTarget.dataset.exIndex);
+    if (moveArrayItem(day.exercises, exIndex, actionTarget.dataset.dir)) {
+      await commitRoutineChange();
+    }
+  }
+
+  if (action === "builder-reset-default") {
+    if (!confirm("Reset your routine back to the default Push/Pull/Legs plan? This replaces your current days.")) return;
+    state.routine = cloneDefaultRoutine();
+    reconcileSelectedRoutine();
+    await commitRoutineChange();
   }
 
   if (action === "sign-out") {
@@ -996,6 +1299,29 @@ document.addEventListener("change", (event) => {
     state.selectedExercise = target.value;
     saveState();
     render();
+  }
+
+  if (target.matches("[data-action='builder-day-field']")) {
+    const day = findRoutineDay(target.dataset.dayId);
+    if (!day) return;
+    day[target.dataset.field] = target.value;
+    saveRoutine();
+  }
+
+  if (target.matches("[data-action='builder-exercise-field']")) {
+    const day = findRoutineDay(target.dataset.dayId);
+    if (!day) return;
+    const exercise = day.exercises[Number(target.dataset.exIndex)];
+    if (!exercise) return;
+    const field = target.dataset.field;
+    if (field === "sets") {
+      const value = Math.max(1, Math.min(20, Math.round(Number(target.value) || 1)));
+      exercise.sets = value;
+      target.value = value;
+    } else {
+      exercise[field] = target.value;
+    }
+    saveRoutine();
   }
 });
 

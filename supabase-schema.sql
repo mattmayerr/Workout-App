@@ -47,6 +47,43 @@ create policy "Users can delete their own workouts"
   for delete
   using (auth.uid() = user_id);
 
+create table if not exists public.routines (
+  user_id uuid primary key references auth.users (id) on delete cascade default auth.uid(),
+  days jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.routines enable row level security;
+
+grant select, insert, update, delete on public.routines to authenticated;
+
+drop policy if exists "Users can view their own routine" on public.routines;
+drop policy if exists "Users can insert their own routine" on public.routines;
+drop policy if exists "Users can update their own routine" on public.routines;
+drop policy if exists "Users can delete their own routine" on public.routines;
+
+create policy "Users can view their own routine"
+  on public.routines
+  for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own routine"
+  on public.routines
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own routine"
+  on public.routines
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete their own routine"
+  on public.routines
+  for delete
+  using (auth.uid() = user_id);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -61,5 +98,12 @@ drop trigger if exists set_workouts_updated_at on public.workouts;
 
 create trigger set_workouts_updated_at
   before update on public.workouts
+  for each row
+  execute function public.set_updated_at();
+
+drop trigger if exists set_routines_updated_at on public.routines;
+
+create trigger set_routines_updated_at
+  before update on public.routines
   for each row
   execute function public.set_updated_at();

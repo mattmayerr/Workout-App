@@ -646,6 +646,84 @@ textarea {
   line-height: 1.55;
 }
 
+.builder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.builder-days {
+  display: grid;
+  gap: 1rem;
+}
+
+.builder-day {
+  display: grid;
+  gap: 1rem;
+}
+
+.builder-day__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.builder-day__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  flex: 1 1 420px;
+}
+
+.builder-day__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.builder-exercises {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.builder-exercises th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.82rem;
+  padding: 0.3rem 0.45rem;
+}
+
+.builder-exercises td {
+  padding: 0.3rem 0.45rem;
+  vertical-align: middle;
+}
+
+.builder-exercises td input,
+.builder-exercises td select {
+  padding: 0.55rem 0.6rem;
+  border-radius: 10px;
+}
+
+.builder-exercise__controls {
+  display: flex;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.builder-exercise__controls .icon-button {
+  min-height: 38px;
+  width: 38px;
+}
+
+.icon-button--danger {
+  border-color: rgba(165, 61, 50, 0.24);
+  background: #fff3f0;
+  color: var(--danger);
+}
+
 @media (max-width: 900px) {
   .app-header,
   .login-shell,
@@ -653,6 +731,10 @@ textarea {
   .grid--metrics,
   .grid--routine,
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-day__fields {
     grid-template-columns: 1fr;
   }
 
@@ -676,8 +758,10 @@ textarea {
     display: grid;
   }
 
-  .sets-table {
+  .sets-table,
+  .builder-exercises {
     display: block;
     overflow-x: auto;
+    white-space: nowrap;
   }
 }

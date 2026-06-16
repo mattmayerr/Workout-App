@@ -49,9 +49,16 @@ After that, open the GitHub Pages site, create an account on `login.html`, and s
 
 - Synced workout history stored in Supabase
 - Login and account creation through `login.html`
+- Per-user custom routines you can edit on the **Edit Routine** tab (add/edit/delete/reorder days and exercises), synced to your account
 - Sets, reps, weight, duration, bodyweight, and notes
 - Total workouts, recent consistency, streak, and total volume
 - Weekly volume and exercise progress using estimated 1-rep max
+
+## Custom Routines
+
+Each account gets its own editable copy of the default Push/Pull/Legs plan. Use the **Edit Routine** tab to add workout days, rename them, add/edit/delete exercises (sets, rep range, muscle group), and reorder days or exercises. Changes save to Supabase automatically and sync across devices.
+
+If you set up Supabase before this feature existed, re-run `supabase-schema.sql` in the Supabase SQL Editor once to create the new `routines` table. It is safe to run again; it only adds the routines table and its security policies.
 
 ## Adjusting the App Later
 
