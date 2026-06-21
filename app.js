@@ -3,46 +3,84 @@ const DRAFT_STORAGE_KEY = "workout-tracker-log-draft-v1";
 
 const DEFAULT_ROUTINE = [
   {
-    id: "push-day",
-    day: "Push",
-    name: "Chest, Shoulders & Triceps",
-    time: "60-75 min",
-    exercises: [
-      { name: "Incline Bench", sets: 4, reps: "6-10", group: "Push" },
-      { name: "Flat Dumbbell Press", sets: 3, reps: "8-12", group: "Push" },
-      { name: "Dumbbell Shoulder Press", sets: 3, reps: "8-12", group: "Push" },
-      { name: "Lateral Raises", sets: 4, reps: "12-15", group: "Push" },
-      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
-    ],
-  },
-  {
-    id: "pull-day",
-    day: "Pull",
+    id: "day-1",
+    day: "Day 1",
     name: "Back & Biceps",
     time: "60-75 min",
     exercises: [
-      { name: "Weighted Pull-Ups", sets: 4, reps: "6-10", group: "Pull" },
-      { name: "Chest Supported Row", sets: 4, reps: "8-12", group: "Pull" },
-      { name: "Cable Row", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Face Pulls", sets: 3, reps: "12-15", group: "Pull" },
+      { name: "Barbell Row", sets: 4, reps: "6-8", group: "Pull" },
+      { name: "Chest Supported Row", sets: 3, reps: "6-8", group: "Pull" },
+      { name: "Face Pulls", sets: 3, reps: "10-12", group: "Pull" },
       { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
       { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
     ],
   },
   {
-    id: "legs-day",
-    day: "Legs",
-    name: "Quads, Hamstrings & Calves",
-    time: "~60 min",
+    id: "day-2",
+    day: "Day 2",
+    name: "Chest & Triceps",
+    time: "60-75 min",
     exercises: [
-      { name: "Squat", sets: 4, reps: "6-10", group: "Legs" },
-      { name: "Romanian Deadlift", sets: 4, reps: "8-12", group: "Legs" },
-      { name: "Leg Press", sets: 3, reps: "10-15", group: "Legs" },
-      { name: "Leg Curl", sets: 3, reps: "10-15", group: "Legs" },
-      { name: "Leg Extension", sets: 3, reps: "12-15", group: "Legs" },
-      { name: "Calf Raises", sets: 4, reps: "15-20", group: "Legs" },
-      { name: "Abs", sets: 3, reps: "10-20", group: "Core" },
+      { name: "Incline Bench", sets: 4, reps: "6-8", group: "Push" },
+      { name: "Flat Dumbbell Press", sets: 3, reps: "6-8", group: "Push" },
+      { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
+      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
+    ],
+  },
+  {
+    id: "day-3",
+    day: "Day 3",
+    name: "Legs & Abs",
+    time: "60 min",
+    exercises: [
+      { name: "Squat", sets: 4, reps: "6-8", group: "Legs" },
+      { name: "Romanian Deadlift", sets: 4, reps: "6-8", group: "Legs" },
+      { name: "Leg Press", sets: 3, reps: "6-8", group: "Legs" },
+      { name: "Leg Curl", sets: 3, reps: "10-12", group: "Legs" },
+      { name: "Calf Raises", sets: 4, reps: "10-12", group: "Legs" },
+      { name: "Abs", sets: 3, reps: "10-12", group: "Core" },
+    ],
+  },
+  {
+    id: "day-4",
+    day: "Day 4",
+    name: "Shoulders & Arms",
+    time: "60-75 min",
+    exercises: [
+      { name: "Dumbbell Shoulder Press", sets: 4, reps: "6-8", group: "Push" },
+      { name: "Lateral Raises", sets: 4, reps: "10-12", group: "Push" },
+      { name: "Face Pulls", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
+      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
+      { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
+    ],
+  },
+  {
+    id: "day-5",
+    day: "Day 5",
+    name: "Chest & Back",
+    time: "60-75 min",
+    exercises: [
+      { name: "Flat Dumbbell Press", sets: 4, reps: "6-8", group: "Push" },
+      { name: "Barbell Row", sets: 4, reps: "6-8", group: "Pull" },
+      { name: "Incline Bench", sets: 3, reps: "6-8", group: "Push" },
+      { name: "Lat Pulldown", sets: 3, reps: "6-8", group: "Pull" },
+      { name: "Cable Row", sets: 3, reps: "6-8", group: "Pull" },
+    ],
+  },
+  {
+    id: "day-6",
+    day: "Day 6",
+    name: "Legs & Shoulders",
+    time: "60-75 min",
+    exercises: [
+      { name: "Hack Squat", sets: 4, reps: "6-8", group: "Legs" },
+      { name: "Leg Extension", sets: 3, reps: "10-12", group: "Legs" },
+      { name: "Leg Curl", sets: 3, reps: "10-12", group: "Legs" },
+      { name: "Seated Shoulder Press", sets: 3, reps: "6-8", group: "Push" },
+      { name: "Lateral Raises", sets: 4, reps: "10-12", group: "Push" },
+      { name: "Calf Raises", sets: 4, reps: "10-12", group: "Legs" },
     ],
   },
 ];
@@ -60,7 +98,7 @@ function loadState() {
   const defaults = {
     activeTab: "dashboard",
     selectedRoutineId: DEFAULT_ROUTINE[0].id,
-    selectedExercise: "Incline Bench",
+    selectedExercise: "Barbell Row",
     formDate: today,
     workouts: [],
     routine: [],
@@ -190,6 +228,66 @@ function cloneDefaultRoutine() {
 function dayTotalSets(day) {
   const total = day.exercises.reduce((sum, exercise) => sum + Number(exercise.sets || 0), 0);
   return `~${total} sets`;
+}
+
+function getSplitGroup(dayLabel) {
+  const match = String(dayLabel || "").match(/^(.+?)\s+[AB]$/i);
+  return match ? match[1].trim() : String(dayLabel || "Other");
+}
+
+function groupRoutineDays(days) {
+  const groups = new Map();
+  days.forEach((day) => {
+    const group = getSplitGroup(day.day);
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(day);
+  });
+  return groups;
+}
+
+function renderRoutineSelectOptions(selectedId) {
+  const groups = groupRoutineDays(state.routine);
+  return [...groups.entries()]
+    .map(([group, days]) => {
+      const options = days
+        .map(
+          (day) =>
+            `<option value="${escapeHtml(day.id)}" ${day.id === selectedId ? "selected" : ""}>${escapeHtml(day.day)}${day.name ? ` - ${escapeHtml(day.name)}` : ""}</option>`,
+        )
+        .join("");
+      return groups.size > 1
+        ? `<optgroup label="${escapeHtml(group)}">${options}</optgroup>`
+        : options;
+    })
+    .join("");
+}
+
+function renderRoutineDayCard(day) {
+  return `
+    <article class="card routine-day">
+      <div>
+        <p class="eyebrow">${escapeHtml(day.day)}</p>
+        <h3>${escapeHtml(day.name)}</h3>
+        <div class="routine-day__meta">
+          <span class="pill">${escapeHtml(day.time)}</span>
+          <span class="pill">${dayTotalSets(day)}</span>
+        </div>
+      </div>
+      <ul class="routine-list">
+        ${day.exercises
+          .map(
+            (exercise) => `
+              <li>
+                <strong>${escapeHtml(exercise.name)}</strong>
+                <span>${exercise.sets} x ${escapeHtml(exercise.reps)}</span>
+              </li>
+            `,
+          )
+          .join("")}
+      </ul>
+      <button class="button-secondary" data-action="log-specific-routine" data-routine-id="${escapeHtml(day.id)}">Log ${escapeHtml(day.day)}</button>
+    </article>
+  `;
 }
 
 const EXERCISE_GROUPS = ["Push", "Pull", "Legs", "Core", "Other"];
@@ -623,7 +721,7 @@ function renderDashboard() {
         <h3>Focus Exercises</h3>
         <p class="muted">These are the exercises doing most of the physique-building work in this plan.</p>
         <div class="workout-card__stats">
-          ${["Incline Bench", "Dumbbell Shoulder Press", "Lateral Raises", "Weighted Pull-Ups", "Chest Supported Row", "Face Pulls", "Squat", "Romanian Deadlift", "Leg Press"]
+          ${["Incline Bench", "Flat Dumbbell Press", "Barbell Row", "Lat Pulldown", "Dumbbell Shoulder Press", "Squat", "Hack Squat", "Romanian Deadlift", "Lateral Raises"]
             .map((name) => `<span class="pill">${name}</span>`)
             .join("")}
         </div>
@@ -775,12 +873,7 @@ function renderLog() {
           <div class="field">
             <label for="routine-select">Routine</label>
             <select id="routine-select" name="routineId" data-action="select-routine">
-              ${state.routine
-                .map(
-                  (day) =>
-                    `<option value="${escapeHtml(day.id)}" ${day.id === selectedRoutine.id ? "selected" : ""}>${escapeHtml(day.day)}${day.name ? ` - ${escapeHtml(day.name)}` : ""}</option>`,
-                )
-                .join("")}
+              ${renderRoutineSelectOptions(selectedRoutine.id)}
             </select>
           </div>
           <div class="field">
@@ -913,48 +1006,32 @@ async function saveWorkout(form) {
 }
 
 function renderRoutine() {
+  const groups = groupRoutineDays(state.routine);
+  const groupedHtml = [...groups.entries()]
+    .map(
+      ([group, days]) => `
+        <section class="routine-split">
+          <h3 class="routine-split__title">${escapeHtml(group)}</h3>
+          <div class="grid grid--routine">
+            ${days.map(renderRoutineDayCard).join("")}
+          </div>
+        </section>
+      `,
+    )
+    .join("");
+
   app.innerHTML = `
     <div class="section-header">
       <div>
         <h2>The Routine</h2>
-        <p>Your current plan. Customize the days and exercises in the routine editor.</p>
+        <p>6-day split. Customize exercises in the routine editor.</p>
       </div>
       <button class="button" data-action="go-builder">Edit routine</button>
     </div>
 
     ${
       state.routine.length
-        ? `<div class="grid grid--routine">
-      ${state.routine
-        .map(
-          (day) => `
-            <article class="card routine-day">
-              <div>
-                <p class="eyebrow">${escapeHtml(day.day)}</p>
-                <h3>${escapeHtml(day.name)}</h3>
-                <div class="routine-day__meta">
-                  <span class="pill">${escapeHtml(day.time)}</span>
-                  <span class="pill">${dayTotalSets(day)}</span>
-                </div>
-              </div>
-              <ul class="routine-list">
-                ${day.exercises
-                  .map(
-                    (exercise) => `
-                      <li>
-                        <strong>${escapeHtml(exercise.name)}</strong>
-                        <span>${exercise.sets} x ${escapeHtml(exercise.reps)}</span>
-                      </li>
-                    `,
-                  )
-                  .join("")}
-              </ul>
-              <button class="button-secondary" data-action="log-specific-routine" data-routine-id="${escapeHtml(day.id)}">Log ${escapeHtml(day.day)}</button>
-            </article>
-          `,
-        )
-        .join("")}
-    </div>`
+        ? groupedHtml
         : `<div class="empty-state"><h2>No workout days yet</h2><p>Build your plan in the routine editor.</p><button class="button" data-action="go-builder">Open routine editor</button></div>`
     }
   `;
@@ -993,7 +1070,7 @@ function renderBuilderDay(day, dayIndex) {
         <div class="builder-day__fields">
           <div class="field">
             <label>Day label</label>
-            <input type="text" value="${escapeHtml(day.day)}" placeholder="Push"
+            <input type="text" value="${escapeHtml(day.day)}" placeholder="Day 1"
               data-action="builder-day-field" data-day-id="${escapeHtml(day.id)}" data-field="day" />
           </div>
           <div class="field">
@@ -1241,7 +1318,7 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "builder-reset-default") {
-    if (!confirm("Reset your routine back to the default Push/Pull/Legs plan? This replaces your current days.")) return;
+    if (!confirm("Reset your routine back to the default 6-day split? This replaces your current days.")) return;
     state.routine = cloneDefaultRoutine();
     reconcileSelectedRoutine();
     await commitRoutineChange();

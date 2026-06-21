@@ -489,6 +489,21 @@ textarea {
   margin-top: 1rem;
 }
 
+.routine-split {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.routine-split:last-child {
+  margin-bottom: 0;
+}
+
+.routine-split__title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
 .routine-day {
   display: grid;
   gap: 0.8rem;
