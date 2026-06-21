@@ -761,7 +761,7 @@ function renderLog() {
     <div class="section-header">
       <div>
         <h2>Log Workout</h2>
-        <p>Pick the workout day, enter each completed set, and save. Empty sets are ignored.</p>
+        <p>Pick the workout day, enter sets and reps for each exercise, and save. Leave an exercise blank to skip it.</p>
       </div>
     </div>
 
@@ -803,7 +803,7 @@ function renderLog() {
       </div>
 
       <div class="form-actions">
-        <p class="form-help">Tip: add reps first. When you hit the top of the range, increase weight next time.</p>
+        <p class="form-help">Tip: enter once per exercise. If every set was the same, one row is enough.</p>
         <button class="button" type="submit">Save workout</button>
       </div>
     </form>
@@ -811,37 +811,33 @@ function renderLog() {
 }
 
 function renderExerciseInputCard(exercise, exerciseIndex, draft = {}) {
-  const rows = Array.from({ length: exercise.sets }, (_, setIndex) => {
-    const weightName = `exercise-${exerciseIndex}-weight-${setIndex}`;
-    const repsName = `exercise-${exerciseIndex}-reps-${setIndex}`;
-    return `
-      <tr>
-        <td>${setIndex + 1}</td>
-        <td><input name="${weightName}" type="number" min="0" step="0.5" inputmode="decimal" placeholder="lbs" value="${escapeHtml(draft[weightName] || "")}" /></td>
-        <td><input name="${repsName}" type="number" min="0" step="1" inputmode="numeric" placeholder="${exercise.reps}" value="${escapeHtml(draft[repsName] || "")}" /></td>
-      </tr>
-    `;
-  }).join("");
+  const weightName = `exercise-${exerciseIndex}-weight`;
+  const setsName = `exercise-${exerciseIndex}-sets`;
+  const repsName = `exercise-${exerciseIndex}-reps`;
 
   return `
     <article class="exercise-card" data-exercise-name="${escapeHtml(exercise.name)}">
       <div class="exercise-card__header">
         <div>
           <h3>${escapeHtml(exercise.name)}</h3>
-          <p>${exercise.sets} sets x ${escapeHtml(exercise.reps)} reps</p>
+          <p>Target: ${exercise.sets} sets x ${escapeHtml(exercise.reps)} reps</p>
         </div>
         <span class="pill">${escapeHtml(exercise.group)}</span>
       </div>
-      <table class="sets-table">
-        <thead>
-          <tr>
-            <th>Set</th>
-            <th>Weight</th>
-            <th>Reps</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
+      <div class="exercise-log-fields">
+        <div class="field">
+          <label for="${weightName}">Weight</label>
+          <input id="${weightName}" name="${weightName}" type="number" min="0" step="0.5" inputmode="decimal" placeholder="lbs" value="${escapeHtml(draft[weightName] || "")}" />
+        </div>
+        <div class="field">
+          <label for="${setsName}">Sets</label>
+          <input id="${setsName}" name="${setsName}" type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="${exercise.sets}" value="${escapeHtml(draft[setsName] || "")}" />
+        </div>
+        <div class="field">
+          <label for="${repsName}">Reps</label>
+          <input id="${repsName}" name="${repsName}" type="number" min="0" step="1" inputmode="numeric" placeholder="${escapeHtml(exercise.reps)}" value="${escapeHtml(draft[repsName] || "")}" />
+        </div>
+      </div>
     </article>
   `;
 }
@@ -856,17 +852,27 @@ async function saveWorkout(form) {
 
   const exercises = selectedRoutine.exercises
     .map((exercise, exerciseIndex) => {
-      const sets = Array.from({ length: exercise.sets }, (_, setIndex) => ({
-        weight: Number(formData.get(`exercise-${exerciseIndex}-weight-${setIndex}`) || 0),
-        reps: Number(formData.get(`exercise-${exerciseIndex}-reps-${setIndex}`) || 0),
-      })).filter((set) => set.reps > 0 || set.weight > 0);
+      const setCount = Number(formData.get(`exercise-${exerciseIndex}-sets`) || 0);
+      const reps = Number(formData.get(`exercise-${exerciseIndex}-reps`) || 0);
+      const weight = Number(formData.get(`exercise-${exerciseIndex}-weight`) || 0);
+
+      if (setCount <= 0 && reps <= 0 && weight <= 0) {
+        return { name: exercise.name, group: exercise.group, sets: [] };
+      }
+
+      if (reps <= 0 && weight <= 0) {
+        return { name: exercise.name, group: exercise.group, sets: [] };
+      }
+
+      const completedSets = setCount > 0 ? setCount : 1;
+      const sets = Array.from({ length: completedSets }, () => ({ weight, reps }));
 
       return { name: exercise.name, group: exercise.group, sets };
     })
     .filter((exercise) => exercise.sets.length);
 
   if (!exercises.length) {
-    alert("Add at least one completed set before saving.");
+    alert("Add at least one exercise with sets or reps before saving.");
     return;
   }
 

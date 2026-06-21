@@ -449,6 +449,13 @@ textarea {
   color: var(--muted);
 }
 
+.exercise-log-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
 .sets-table {
   width: 100%;
   border-collapse: collapse;
@@ -763,5 +770,9 @@ textarea {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+  }
+
+  .exercise-log-fields {
+    grid-template-columns: 1fr;
   }
 }
