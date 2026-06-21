@@ -332,6 +332,72 @@ function estimatedOneRepMax(weight, reps) {
   return weightValue * (1 + repValue / 30);
 }
 
+function sortWorkoutsNewestFirst(workouts) {
+  return [...workouts].sort((a, b) => {
+    const dateCmp = b.date.localeCompare(a.date);
+    if (dateCmp !== 0) return dateCmp;
+    return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+  });
+}
+
+function getLastWorkoutForRoutine(routine) {
+  if (!routine) return null;
+
+  const byId = sortWorkoutsNewestFirst(state.workouts.filter((workout) => workout.routineId === routine.id));
+  if (byId.length) return byId[0];
+
+  const routineLabel = `${routine.day} - ${routine.name}`;
+  const byName = sortWorkoutsNewestFirst(
+    state.workouts.filter(
+      (workout) => workout.routineName === routineLabel || workout.routineName.startsWith(`${routine.day} -`),
+    ),
+  );
+  return byName[0] ?? null;
+}
+
+function summarizeLoggedExercise(exercise) {
+  const sets = exercise.sets.filter((set) => Number(set.reps) > 0 || Number(set.weight) > 0);
+  if (!sets.length) return null;
+
+  const setCount = sets.length;
+  const firstWeight = Number(sets[0].weight || 0);
+  const firstReps = Number(sets[0].reps || 0);
+  const allSame = sets.every(
+    (set) => Number(set.weight || 0) === firstWeight && Number(set.reps || 0) === firstReps,
+  );
+
+  if (allSame) {
+    const parts = [];
+    if (firstWeight) parts.push(`${firstWeight} lb`);
+    parts.push(`${setCount} set${setCount === 1 ? "" : "s"}`);
+    if (firstReps) parts.push(`${firstReps} reps`);
+    return parts.join(" · ");
+  }
+
+  const bestSet = sets.reduce(
+    (best, set) => {
+      const e1rm = estimatedOneRepMax(set.weight, set.reps);
+      return e1rm > best.e1rm ? { weight: Number(set.weight || 0), reps: Number(set.reps || 0), e1rm } : best;
+    },
+    { weight: 0, reps: 0, e1rm: 0 },
+  );
+
+  return `Best: ${bestSet.weight} lb × ${bestSet.reps} (${setCount} sets)`;
+}
+
+function getLastExerciseLogsForRoutine(routine) {
+  const lastWorkout = getLastWorkoutForRoutine(routine);
+  if (!lastWorkout) return { lastWorkout: null, byName: new Map() };
+
+  const byName = new Map();
+  lastWorkout.exercises.forEach((exercise) => {
+    const summary = summarizeLoggedExercise(exercise);
+    if (summary) byName.set(exercise.name, summary);
+  });
+
+  return { lastWorkout, byName };
+}
+
 function getAllExerciseNames() {
   const routineNames = state.routine.flatMap((day) => day.exercises.map((exercise) => exercise.name));
   const loggedNames = state.workouts.flatMap((workout) =>
@@ -854,6 +920,7 @@ function renderLog() {
   }
   const selectedRoutine = getRoutine();
   const dateValue = draft.date || state.formDate;
+  const { lastWorkout, byName: lastExerciseLogs } = getLastExerciseLogsForRoutine(selectedRoutine);
 
   app.innerHTML = `
     <div class="section-header">
@@ -862,6 +929,12 @@ function renderLog() {
         <p>Pick the workout day, enter sets and reps for each exercise, and save. Leave an exercise blank to skip it.</p>
       </div>
     </div>
+
+    ${
+      lastWorkout
+        ? `<p class="last-workout-banner">Last ${escapeHtml(selectedRoutine.day)} session: ${formatDate(lastWorkout.date)}</p>`
+        : ""
+    }
 
     <form id="workout-form">
       <div class="card">
@@ -892,7 +965,7 @@ function renderLog() {
       </div>
 
       <div class="exercise-list">
-        ${selectedRoutine.exercises.map((exercise, index) => renderExerciseInputCard(exercise, index, draft)).join("")}
+        ${selectedRoutine.exercises.map((exercise, index) => renderExerciseInputCard(exercise, index, draft, lastExerciseLogs, Boolean(lastWorkout))).join("")}
       </div>
 
       <div class="form-actions">
@@ -903,10 +976,16 @@ function renderLog() {
   `;
 }
 
-function renderExerciseInputCard(exercise, exerciseIndex, draft = {}) {
+function renderExerciseInputCard(exercise, exerciseIndex, draft = {}, lastExerciseLogs = new Map(), hasLastSession = false) {
   const weightName = `exercise-${exerciseIndex}-weight`;
   const setsName = `exercise-${exerciseIndex}-sets`;
   const repsName = `exercise-${exerciseIndex}-reps`;
+  const lastLog = lastExerciseLogs.get(exercise.name);
+  const lastLogMarkup = lastLog
+    ? `<p class="exercise-last-log">Last time: ${escapeHtml(lastLog)}</p>`
+    : hasLastSession
+      ? `<p class="exercise-last-log exercise-last-log--empty">Skipped last time</p>`
+      : `<p class="exercise-last-log exercise-last-log--empty">No previous session yet</p>`;
 
   return `
     <article class="exercise-card" data-exercise-name="${escapeHtml(exercise.name)}">
@@ -914,6 +993,7 @@ function renderExerciseInputCard(exercise, exerciseIndex, draft = {}) {
         <div>
           <h3>${escapeHtml(exercise.name)}</h3>
           <p>Target: ${exercise.sets} sets x ${escapeHtml(exercise.reps)} reps</p>
+          ${lastLogMarkup}
         </div>
         <span class="pill">${escapeHtml(exercise.group)}</span>
       </div>
