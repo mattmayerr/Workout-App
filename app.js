@@ -12,7 +12,9 @@ const DEFAULT_ROUTINE = [
       { name: "Flat Dumbbell Press", sets: 3, reps: "6-8", group: "Push" },
       { name: "Dumbbell Shoulder Press", sets: 3, reps: "6-8", group: "Push" },
       { name: "Lateral Raises", sets: 4, reps: "10-12", group: "Push" },
+      { name: "Close Grip Bench Press", sets: 3, reps: "6-8", group: "Push" },
       { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
+      { name: "Skull Crushers", sets: 3, reps: "10-12", group: "Push" },
       { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
     ],
   },
@@ -27,7 +29,9 @@ const DEFAULT_ROUTINE = [
       { name: "Chest Supported Row", sets: 3, reps: "6-8", group: "Pull" },
       { name: "Face Pulls", sets: 3, reps: "10-12", group: "Pull" },
       { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Incline Dumbbell Curl", sets: 3, reps: "10-12", group: "Pull" },
       { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Cable Curl", sets: 3, reps: "10-12", group: "Pull" },
     ],
   },
   {
@@ -749,7 +753,7 @@ function renderDashboard() {
         <h3>Focus Exercises</h3>
         <p class="muted">These are the exercises doing most of the physique-building work in this plan.</p>
         <div class="workout-card__stats">
-          ${["Incline Bench", "Flat Dumbbell Press", "Dumbbell Shoulder Press", "Barbell Row", "Lat Pulldown", "Squat", "Romanian Deadlift", "Leg Press", "Lateral Raises"]
+          ${["Incline Bench", "Close Grip Bench Press", "Barbell Row", "Lat Pulldown", "Squat", "Romanian Deadlift", "Rope Pushdown", "Barbell Curl", "Hammer Curl"]
             .map((name) => `<span class="pill">${name}</span>`)
             .join("")}
         </div>
