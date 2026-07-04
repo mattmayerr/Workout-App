@@ -3,34 +3,44 @@ const DRAFT_STORAGE_KEY = "workout-tracker-log-draft-v1";
 
 const DEFAULT_ROUTINE = [
   {
-    id: "push",
-    day: "Push",
-    name: "Chest, Shoulders & Triceps",
+    id: "chest",
+    day: "Chest",
+    name: "Chest & Shoulders",
     time: "60-75 min",
     exercises: [
       { name: "Incline Bench", sets: 4, reps: "6-8", group: "Push" },
       { name: "Flat Dumbbell Press", sets: 3, reps: "6-8", group: "Push" },
-      { name: "Dumbbell Shoulder Press", sets: 3, reps: "6-8", group: "Push" },
+      { name: "Cable Fly", sets: 3, reps: "10-12", group: "Push" },
+      { name: "Dumbbell Fly", sets: 3, reps: "10-12", group: "Push" },
       { name: "Lateral Raises", sets: 4, reps: "10-12", group: "Push" },
-      { name: "Close Grip Bench Press", sets: 3, reps: "6-8", group: "Push" },
-      { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Skull Crushers", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
     ],
   },
   {
-    id: "pull",
-    day: "Pull",
-    name: "Back & Biceps",
+    id: "back",
+    day: "Back",
+    name: "Back & Rear Delts",
     time: "60-75 min",
     exercises: [
       { name: "Barbell Row", sets: 4, reps: "6-8", group: "Pull" },
       { name: "Lat Pulldown", sets: 3, reps: "6-8", group: "Pull" },
       { name: "Chest Supported Row", sets: 3, reps: "6-8", group: "Pull" },
+      { name: "Cable Row", sets: 3, reps: "6-8", group: "Pull" },
       { name: "Face Pulls", sets: 3, reps: "10-12", group: "Pull" },
+    ],
+  },
+  {
+    id: "arms",
+    day: "Arms",
+    name: "Biceps & Triceps",
+    time: "60-75 min",
+    exercises: [
+      { name: "Close Grip Bench Press", sets: 3, reps: "6-8", group: "Push" },
       { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
       { name: "Incline Dumbbell Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Skull Crushers", sets: 3, reps: "10-12", group: "Push" },
       { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
+      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
       { name: "Cable Curl", sets: 3, reps: "10-12", group: "Pull" },
     ],
   },
@@ -753,7 +763,7 @@ function renderDashboard() {
         <h3>Focus Exercises</h3>
         <p class="muted">These are the exercises doing most of the physique-building work in this plan.</p>
         <div class="workout-card__stats">
-          ${["Incline Bench", "Close Grip Bench Press", "Barbell Row", "Lat Pulldown", "Squat", "Romanian Deadlift", "Rope Pushdown", "Barbell Curl", "Hammer Curl"]
+          ${["Incline Bench", "Flat Dumbbell Press", "Barbell Row", "Lat Pulldown", "Close Grip Bench Press", "Barbell Curl", "Rope Pushdown", "Squat", "Romanian Deadlift"]
             .map((name) => `<span class="pill">${name}</span>`)
             .join("")}
         </div>
@@ -1070,7 +1080,7 @@ function renderRoutine() {
     <div class="section-header">
       <div>
         <h2>The Routine</h2>
-        <p>Push / Pull / Legs. Customize exercises in the routine editor.</p>
+        <p>Chest, Back, Arms, Legs. Customize exercises in the routine editor.</p>
       </div>
       <button class="button" data-action="go-builder">Edit routine</button>
     </div>
@@ -1116,7 +1126,7 @@ function renderBuilderDay(day, dayIndex) {
         <div class="builder-day__fields">
           <div class="field">
             <label>Day label</label>
-            <input type="text" value="${escapeHtml(day.day)}" placeholder="Push"
+            <input type="text" value="${escapeHtml(day.day)}" placeholder="Chest"
               data-action="builder-day-field" data-day-id="${escapeHtml(day.id)}" data-field="day" />
           </div>
           <div class="field">
@@ -1364,7 +1374,7 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "builder-reset-default") {
-    if (!confirm("Reset your routine back to the default Push/Pull/Legs plan? This replaces your current days.")) return;
+    if (!confirm("Reset your routine back to the default Chest/Back/Arms/Legs plan? This replaces your current days.")) return;
     state.routine = cloneDefaultRoutine();
     reconcileSelectedRoutine();
     await commitRoutineChange();
