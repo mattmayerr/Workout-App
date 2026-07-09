@@ -34,7 +34,7 @@ const DEFAULT_ROUTINE = [
     name: "Biceps & Triceps",
     time: "60-75 min",
     exercises: [
-      { name: "Close Grip Bench Press", sets: 3, reps: "6-8", group: "Push" },
+      { name: "Dips", sets: 3, reps: "6-8", group: "Push" },
       { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
       { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
       { name: "Incline Dumbbell Curl", sets: 3, reps: "10-12", group: "Pull" },
@@ -763,7 +763,7 @@ function renderDashboard() {
         <h3>Focus Exercises</h3>
         <p class="muted">These are the exercises doing most of the physique-building work in this plan.</p>
         <div class="workout-card__stats">
-          ${["Incline Bench", "Flat Dumbbell Press", "Barbell Row", "Lat Pulldown", "Close Grip Bench Press", "Barbell Curl", "Rope Pushdown", "Squat", "Romanian Deadlift"]
+          ${["Incline Bench", "Flat Dumbbell Press", "Barbell Row", "Lat Pulldown", "Dips", "Barbell Curl", "Rope Pushdown", "Squat", "Romanian Deadlift"]
             .map((name) => `<span class="pill">${name}</span>`)
             .join("")}
         </div>
