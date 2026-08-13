@@ -73,8 +73,15 @@ const supabaseClient = createSupabaseClient();
 
 let state = loadState();
 
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function loadState() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateKey(new Date());
   const defaults = {
     activeTab: "dashboard",
     selectedRoutineId: DEFAULT_ROUTINE[0].id,
@@ -91,7 +98,9 @@ function loadState() {
 
   try {
     const saved = JSON.parse(localStorage.getItem(UI_STORAGE_KEY));
-    return saved ? { ...defaults, ...saved, workouts: [], routine: [] } : defaults;
+    return saved
+      ? { ...defaults, ...saved, formDate: today, workouts: [], routine: [] }
+      : defaults;
   } catch {
     return defaults;
   }
@@ -102,7 +111,6 @@ function saveState() {
     activeTab: state.activeTab,
     selectedRoutineId: state.selectedRoutineId,
     selectedExercise: state.selectedExercise,
-    formDate: state.formDate,
   };
 
   localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(uiState));
@@ -421,15 +429,15 @@ function calculateStreak() {
   const workoutDates = new Set(state.workouts.map((workout) => workout.date));
   let streak = 0;
   const cursor = new Date();
-  const todayKey = cursor.toISOString().slice(0, 10);
+  const todayKey = toDateKey(cursor);
   const yesterday = new Date(cursor);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+  const yesterdayKey = toDateKey(yesterday);
 
   if (!workoutDates.has(todayKey) && !workoutDates.has(yesterdayKey)) return 0;
 
   for (let index = 0; index < 365; index += 1) {
-    const key = cursor.toISOString().slice(0, 10);
+    const key = toDateKey(cursor);
     if (workoutDates.has(key)) {
       streak += 1;
     } else if (streak > 0) {
