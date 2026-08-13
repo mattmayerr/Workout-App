@@ -65,6 +65,16 @@ const DEFAULT_ROUTINE = [
   },
 ];
 
+// The Goals card tracks these three. Edit them here and nowhere else.
+// Names are matched loosely against logged exercises, so "Barbell Curls"
+// still finds "Barbell Curl" — but renaming a lift in the routine editor
+// far enough will show that row as "Not logged yet" rather than guess.
+const STRENGTH_GOALS = [
+  { name: "Squat", target: 275 },
+  { name: "Incline Bench", target: 225 },
+  { name: "Barbell Curl", target: 95 },
+];
+
 const app = document.querySelector("#app");
 const tabs = document.querySelectorAll(".tab");
 const tabsNav = document.querySelector(".tabs");
@@ -457,24 +467,52 @@ function workoutsInLastDays(days) {
   return state.workouts.filter((workout) => new Date(`${workout.date}T00:00:00`) >= start);
 }
 
-function getWeekKey(dateValue) {
-  const date = new Date(`${dateValue}T00:00:00`);
-  const firstDay = new Date(date.getFullYear(), 0, 1);
-  const days = Math.floor((date - firstDay) / 86400000);
-  const week = Math.ceil((days + firstDay.getDay() + 1) / 7);
-  return `${date.getFullYear()} W${String(week).padStart(2, "0")}`;
+function normalizeExerciseName(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
-function weeklyVolumeData() {
-  const grouped = new Map();
-  state.workouts.forEach((workout) => {
-    const key = getWeekKey(workout.date);
-    grouped.set(key, (grouped.get(key) || 0) + workoutVolume(workout));
-  });
+function exerciseNamesMatch(a, b) {
+  const left = normalizeExerciseName(a);
+  const right = normalizeExerciseName(b);
+  if (left === right) return true;
+  // "Barbell Curls" and "Barbell Curl" are the same lift.
+  return left.replace(/s$/, "") === right.replace(/s$/, "");
+}
 
-  return [...grouped.entries()]
-    .map(([label, value]) => ({ label, value }))
-    .slice(-8);
+function heaviestSetWeight(exercise) {
+  return exercise.sets.reduce((best, set) => Math.max(best, Number(set.weight || 0)), 0);
+}
+
+function findLastLoggedWeight(exerciseName) {
+  for (const workout of sortWorkoutsNewestFirst(state.workouts)) {
+    const exercise = workout.exercises.find((item) => exerciseNamesMatch(item.name, exerciseName));
+    if (!exercise) continue;
+    // A session logged at bodyweight is not a data point for a weight goal.
+    const weight = heaviestSetWeight(exercise);
+    if (weight > 0) return { weight, date: workout.date };
+  }
+  return null;
+}
+
+function goalProgress(goal) {
+  const last = findLastLoggedWeight(goal.name);
+
+  if (!last) {
+    return { name: goal.name, target: goal.target, current: null, delta: null, date: null, state: "none" };
+  }
+
+  const delta = last.weight - goal.target;
+  return {
+    name: goal.name,
+    target: goal.target,
+    current: last.weight,
+    delta,
+    date: last.date,
+    state: delta === 0 ? "reached" : delta > 0 ? "over" : "short",
+  };
 }
 
 function rowToWorkout(row) {
@@ -744,15 +782,7 @@ function renderDashboard() {
     </div>
 
     <div class="grid grid--two" style="margin-top: 1rem;">
-      <article class="card">
-        <div class="section-header">
-          <div>
-            <h3>Weekly Volume</h3>
-            <p>More volume over time usually means you're doing more productive work.</p>
-          </div>
-        </div>
-        ${renderVolumeBars(weeklyVolumeData())}
-      </article>
+      ${renderGoalsCard()}
 
       <article class="card">
         <h3>Latest Workout</h3>
@@ -784,24 +814,59 @@ function renderDashboard() {
   `;
 }
 
-function renderVolumeBars(data) {
-  if (!data.length) return `<p class="muted">Log workouts to build this chart.</p>`;
+function goalDeltaCopy(progress) {
+  if (progress.state === "none") return "Not logged yet";
+  if (progress.state === "reached") return "Reached";
+  if (progress.state === "over") return `${currencyNumber(progress.delta)} lbs over`;
+  return `${currencyNumber(Math.abs(progress.delta))} lbs to go`;
+}
 
-  const max = Math.max(...data.map((item) => item.value), 1);
+function renderGoalRow(progress) {
+  const hasData = progress.current !== null;
+  const percent = hasData
+    ? Math.min((progress.current / Math.max(progress.target, 1)) * 100, 100)
+    : 0;
+
   return `
-    <div class="chart" role="img" aria-label="Weekly workout volume bar chart">
-      ${data
-        .map((item) => {
-          const height = Math.max((item.value / max) * 100, 4);
-          return `
-            <div class="bar-wrap" title="${item.label}: ${currencyNumber(item.value)}">
-              <div class="bar" style="height: ${height}%"></div>
-              <span class="bar-label">${escapeHtml(item.label.replace("20", "'"))}</span>
-            </div>
-          `;
-        })
-        .join("")}
+    <div class="goal-row goal-row--${progress.state}">
+      <div class="goal-row__top">
+        <strong>${escapeHtml(progress.name)}</strong>
+        <span class="goal-row__weights">
+          ${hasData ? currencyNumber(progress.current) : "--"} &rarr; ${currencyNumber(progress.target)} lb
+        </span>
+      </div>
+      <div
+        class="goal-bar"
+        role="img"
+        aria-label="${escapeHtml(progress.name)}: ${goalDeltaCopy(progress)}"
+      >
+        <div class="goal-bar__fill" style="width: ${percent}%"></div>
+      </div>
+      <div class="goal-row__foot">
+        <span class="goal-row__delta">${goalDeltaCopy(progress)}</span>
+        <span class="muted">${
+          progress.date
+            ? `last lifted ${formatDate(progress.date)}`
+            : "nothing in your history matches this name"
+        }</span>
+      </div>
     </div>
+  `;
+}
+
+function renderGoalsCard() {
+  return `
+    <article class="card">
+      <div class="section-header">
+        <div>
+          <h3>Goals</h3>
+          <p>Your last working weight on each lift, against where you are headed.</p>
+        </div>
+      </div>
+      <div class="goal-list">
+        ${STRENGTH_GOALS.map((goal) => renderGoalRow(goalProgress(goal))).join("")}
+      </div>
+    </article>
   `;
 }
 
