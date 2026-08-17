@@ -1,66 +1,38 @@
 const UI_STORAGE_KEY = "workout-tracker-ui-v1";
 const DRAFT_STORAGE_KEY = "workout-tracker-log-draft-v1";
 
+// Upper/Lower, run Upper / Lower / rest / Upper / Lower.
+// Every day is sized for 45 minutes, which is about 18 working sets once you
+// rest two minutes on the heavy compounds. Adding a seventh exercise breaks that.
+// Squat, Incline Bench and Barbell Curl must keep these exact names — STRENGTH_GOALS
+// below matches on them, and a rename shows the Goals card as "Not logged yet".
 const DEFAULT_ROUTINE = [
   {
-    id: "chest",
-    day: "Chest",
-    name: "Chest & Shoulders",
-    time: "60-75 min",
+    id: "upper",
+    day: "Upper",
+    name: "Chest, Back, Shoulders & Arms",
+    time: "45 min",
     exercises: [
       { name: "Incline Bench", sets: 4, reps: "6-8", group: "Push" },
-      { name: "Flat Dumbbell Press", sets: 3, reps: "6-8", group: "Push" },
-      { name: "Cable Fly", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Dumbbell Shoulder Press", sets: 3, reps: "6-8", group: "Push" },
-      { name: "Lateral Raises", sets: 4, reps: "10-12", group: "Push" },
-      { name: "Front Raises", sets: 3, reps: "10-12", group: "Push" },
-    ],
-  },
-  {
-    id: "back",
-    day: "Back",
-    name: "Back & Rear Delts",
-    time: "60-75 min",
-    exercises: [
-      { name: "Barbell Row", sets: 4, reps: "6-8", group: "Pull" },
-      { name: "Lat Pulldown", sets: 3, reps: "6-8", group: "Pull" },
-      { name: "Chest Supported Row", sets: 3, reps: "6-8", group: "Pull" },
-      { name: "Cable Row", sets: 3, reps: "6-8", group: "Pull" },
-      { name: "Face Pulls", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Rear Delt Fly", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Dumbbell Shrugs", sets: 3, reps: "10-12", group: "Pull" },
-    ],
-  },
-  {
-    id: "arms",
-    day: "Arms",
-    name: "Biceps, Triceps & Shoulders",
-    time: "60-75 min",
-    exercises: [
-      { name: "Dips", sets: 3, reps: "6-8", group: "Push" },
+      { name: "Barbell Row", sets: 3, reps: "6-8", group: "Pull" },
+      { name: "Dumbbell Shoulder Press", sets: 3, reps: "8-10", group: "Push" },
+      { name: "Lat Pulldown", sets: 3, reps: "8-10", group: "Pull" },
       { name: "Barbell Curl", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Rope Pushdown", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Incline Dumbbell Curl", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Skull Crushers", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Hammer Curl", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Overhead Tricep Extension", sets: 3, reps: "10-12", group: "Push" },
-      { name: "Cable Curl", sets: 3, reps: "10-12", group: "Pull" },
-      { name: "Lateral Raises", sets: 3, reps: "10-12", group: "Push" },
+      { name: "Rope Pushdown", sets: 2, reps: "12-15", group: "Push" },
     ],
   },
   {
-    id: "legs",
-    day: "Legs",
-    name: "Quads, Hamstrings & Abs",
-    time: "60 min",
+    id: "lower",
+    day: "Lower",
+    name: "Quads, Hamstrings, Calves & Abs",
+    time: "45 min",
     exercises: [
       { name: "Squat", sets: 4, reps: "6-8", group: "Legs" },
-      { name: "Romanian Deadlift", sets: 4, reps: "6-8", group: "Legs" },
-      { name: "Leg Press", sets: 3, reps: "6-8", group: "Legs" },
-      { name: "Leg Extension", sets: 3, reps: "10-12", group: "Legs" },
+      { name: "Romanian Deadlift", sets: 3, reps: "6-8", group: "Legs" },
+      { name: "Leg Press", sets: 3, reps: "8-10", group: "Legs" },
       { name: "Leg Curl", sets: 3, reps: "10-12", group: "Legs" },
-      { name: "Calf Raises", sets: 4, reps: "10-12", group: "Legs" },
-      { name: "Abs", sets: 3, reps: "10-12", group: "Core" },
+      { name: "Calf Raises", sets: 3, reps: "12-15", group: "Legs" },
+      { name: "Abs", sets: 2, reps: "12-15", group: "Core" },
     ],
   },
 ];
