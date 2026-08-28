@@ -70,10 +70,10 @@ const DEFAULT_ROUTINE = [
   },
 ];
 
-// The Goals card tracks these three. Edit them here and nowhere else.
-// Names are matched loosely against logged exercises, so "Barbell Curls"
-// still finds "Barbell Curl" — but renaming a lift in the routine editor
-// far enough will show that row as "Not logged yet" rather than guess.
+// Seed default for a brand-new profile's goals (profiles.goals in Supabase).
+// Edited from the Profile tab going forward, not here. Names are matched
+// loosely against logged exercises, so "Barbell Curls" still finds
+// "Barbell Curl" — but renaming a lift far enough shows "Not logged yet".
 const STRENGTH_GOALS = [
   { name: "Squat", target: 275 },
   { name: "Incline Bench", target: 225 },
@@ -87,6 +87,11 @@ const accountStatus = document.querySelector("#account-status");
 const supabaseClient = createSupabaseClient();
 
 let state = loadState();
+applyTheme();
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.profile?.theme || state.theme || "light";
+}
 
 function toDateKey(date) {
   const year = date.getFullYear();
@@ -109,12 +114,16 @@ function loadState() {
     isLoading: true,
     authMessage: "",
     dataMessage: "",
+    profile: null,
+    profileMessage: "",
+    theme: "light",
+    avatarUploading: false,
   };
 
   try {
     const saved = JSON.parse(localStorage.getItem(UI_STORAGE_KEY));
     return saved
-      ? { ...defaults, ...saved, formDate: today, workouts: [], routine: [] }
+      ? { ...defaults, ...saved, formDate: today, workouts: [], routine: [], profile: null }
       : defaults;
   } catch {
     return defaults;
@@ -126,6 +135,7 @@ function saveState() {
     activeTab: state.activeTab,
     selectedRoutineId: state.selectedRoutineId,
     selectedExercise: state.selectedExercise,
+    theme: state.profile?.theme || state.theme || "light",
   };
 
   localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(uiState));
@@ -191,6 +201,41 @@ function currencyNumber(value) {
   return Math.round(value).toLocaleString();
 }
 
+const KG_PER_LB = 0.45359237;
+
+// Canonical storage is always pounds. These two are the only place a unit
+// preference should ever touch a weight-scaled number — everything else
+// (goalProgress, workoutVolume, e1RM) stays pure lb math.
+function toDisplayWeight(lbValue, units) {
+  const value = Number(lbValue || 0);
+  return units === "kg" ? value * KG_PER_LB : value;
+}
+
+function fromDisplayWeight(displayValue, units) {
+  const value = Number(displayValue || 0);
+  return units === "kg" ? value / KG_PER_LB : value;
+}
+
+function weightUnitLabel(units) {
+  return units === "kg" ? "kg" : "lb";
+}
+
+function currentUnits() {
+  return state.profile?.units || "lb";
+}
+
+function displayWeightNumber(lbValue, units) {
+  const display = toDisplayWeight(lbValue, units);
+  return units === "kg" ? (Math.round(display * 10) / 10).toLocaleString() : currencyNumber(display);
+}
+
+// Plain numeric value (no thousands separator) — safe to drop into a
+// number input's value attribute, unlike displayWeightNumber's formatted string.
+function displayWeightValue(lbValue, units) {
+  const display = toDisplayWeight(lbValue, units);
+  return units === "kg" ? Math.round(display * 10) / 10 : Math.round(display);
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -226,6 +271,29 @@ function cloneDefaultRoutine() {
     time: day.time,
     exercises: day.exercises.map((exercise) => ({ ...exercise })),
   }));
+}
+
+function cloneDefaultGoals() {
+  return STRENGTH_GOALS.map((goal) => ({ ...goal }));
+}
+
+function getInitials(displayName, email) {
+  const source = String(displayName || "").trim() || String(email || "").trim();
+  if (!source) return "?";
+  const parts = source.split(/\s+/).filter(Boolean);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : source.slice(0, 2).toUpperCase();
+}
+
+function renderAvatar(profile, size = "sm") {
+  const cls = `avatar-circle avatar-circle--${size}`;
+  if (profile?.avatarUrl) {
+    const cacheBust = encodeURIComponent(profile.updatedAt || "");
+    return `<img class="${cls}" src="${escapeHtml(profile.avatarUrl)}?v=${cacheBust}" alt="Profile photo" />`;
+  }
+  const initials = getInitials(profile?.displayName, state.session?.user?.email);
+  return `<span class="${cls} avatar-circle--initials">${escapeHtml(initials)}</span>`;
 }
 
 function dayTotalSets(day) {
@@ -328,6 +396,10 @@ function workoutVolume(workout) {
   }, 0);
 }
 
+function allTimeVolume() {
+  return state.workouts.reduce((total, workout) => total + workoutVolume(workout), 0);
+}
+
 function estimatedOneRepMax(weight, reps) {
   const weightValue = Number(weight || 0);
   const repValue = Number(reps || 0);
@@ -369,9 +441,11 @@ function summarizeLoggedExercise(exercise) {
     (set) => Number(set.weight || 0) === firstWeight && Number(set.reps || 0) === firstReps,
   );
 
+  const units = currentUnits();
+
   if (allSame) {
     const parts = [];
-    if (firstWeight) parts.push(`${firstWeight} lb`);
+    if (firstWeight) parts.push(`${displayWeightNumber(firstWeight, units)} ${weightUnitLabel(units)}`);
     parts.push(`${setCount} set${setCount === 1 ? "" : "s"}`);
     if (firstReps) parts.push(`${firstReps} reps`);
     return parts.join(" · ");
@@ -385,7 +459,7 @@ function summarizeLoggedExercise(exercise) {
     { weight: 0, reps: 0, e1rm: 0 },
   );
 
-  return `Best: ${bestSet.weight} lb × ${bestSet.reps} (${setCount} sets)`;
+  return `Best: ${displayWeightNumber(bestSet.weight, units)} ${weightUnitLabel(units)} × ${bestSet.reps} (${setCount} sets)`;
 }
 
 function getLastExerciseLogsForRoutine(routine) {
@@ -555,7 +629,7 @@ async function loadWorkouts(showLoading = true) {
     render();
   }
 
-  await loadRoutine();
+  await Promise.all([loadRoutine(), loadProfile()]);
 
   const { data, error } = await supabaseClient
     .from("workouts")
@@ -651,12 +725,160 @@ async function saveRoutine() {
   if (error) render();
 }
 
+function normalizeGoals(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({ name: String(item.name || "Goal"), target: Number(item.target || 0) }));
+}
+
+function defaultProfile() {
+  return { displayName: "", units: "lb", theme: "light", avatarUrl: null, goals: cloneDefaultGoals(), updatedAt: null };
+}
+
+function rowToProfile(row) {
+  const goals = normalizeGoals(row.goals);
+  return {
+    displayName: row.display_name || "",
+    units: row.units === "kg" ? "kg" : "lb",
+    theme: row.theme === "dark" ? "dark" : "light",
+    avatarUrl: row.avatar_url || null,
+    goals: goals.length ? goals : cloneDefaultGoals(),
+    updatedAt: row.updated_at || null,
+  };
+}
+
+function profileToRow(profile) {
+  return {
+    user_id: state.session.user.id,
+    display_name: profile.displayName || null,
+    units: profile.units,
+    theme: profile.theme,
+    avatar_url: profile.avatarUrl,
+    goals: profile.goals,
+  };
+}
+
+async function loadProfile() {
+  if (!supabaseClient || !isSignedIn()) return;
+
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("display_name, units, theme, avatar_url, goals, updated_at")
+    .eq("user_id", state.session.user.id)
+    .maybeSingle();
+
+  if (error) {
+    state.profileMessage = error.message;
+    state.profile = defaultProfile();
+    return;
+  }
+
+  if (!data) {
+    state.profile = defaultProfile();
+    const { error: seedError } = await supabaseClient
+      .from("profiles")
+      .insert(profileToRow(state.profile));
+    state.profileMessage = seedError ? seedError.message : "";
+    return;
+  }
+
+  state.profile = rowToProfile(data);
+  state.profileMessage = "";
+}
+
+async function saveProfile() {
+  if (!supabaseClient || !isSignedIn()) return;
+
+  const { error } = await supabaseClient
+    .from("profiles")
+    .upsert(profileToRow(state.profile), { onConflict: "user_id" });
+
+  state.profileMessage = error ? error.message : "";
+  if (error) render();
+}
+
+async function commitProfileChange() {
+  render();
+  await saveProfile();
+}
+
+function resizeImageToBlob(file, maxDimension) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+      const width = Math.round(img.width * scale);
+      const height = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(objectUrl);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Could not process image."))),
+        "image/jpeg",
+        0.85,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read image file."));
+    };
+    img.src = objectUrl;
+  });
+}
+
+async function handleAvatarFileChange(file) {
+  if (!file || !state.profile || !supabaseClient) return;
+
+  if (!file.type.startsWith("image/")) {
+    state.profileMessage = "Please choose an image file.";
+    render();
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    state.profileMessage = "Image must be smaller than 5MB.";
+    render();
+    return;
+  }
+
+  state.avatarUploading = true;
+  state.profileMessage = "";
+  render();
+
+  try {
+    const blob = await resizeImageToBlob(file, 512);
+    const path = `${state.session.user.id}/avatar.jpg`;
+    const { error: uploadError } = await supabaseClient.storage
+      .from("avatars")
+      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabaseClient.storage.from("avatars").getPublicUrl(path);
+    state.profile.avatarUrl = data.publicUrl;
+    await saveProfile();
+    // Refetch so profile.updatedAt (the cache-bust key on the <img> src) reflects
+    // this upload — saveProfile()'s upsert doesn't return the trigger-set value.
+    await loadProfile();
+  } catch (error) {
+    state.profileMessage = error?.message || "Photo upload failed.";
+  }
+
+  state.avatarUploading = false;
+  render();
+}
+
 async function signOut() {
   if (!supabaseClient) return;
 
   await supabaseClient.auth.signOut();
   state.session = null;
   state.workouts = [];
+  state.profile = null;
   state.activeTab = "dashboard";
   state.authMessage = "";
   saveState();
@@ -684,8 +906,12 @@ function renderAccountStatus() {
     return;
   }
 
+  const name = state.profile?.displayName || state.session.user.email;
   accountStatus.innerHTML = `
-    <p><strong>${escapeHtml(state.session.user.email)}</strong></p>
+    <div class="account-status__row">
+      ${renderAvatar(state.profile, "sm")}
+      <p><strong>${escapeHtml(name)}</strong></p>
+    </div>
     <button class="button-secondary" data-action="sign-out" type="button">Sign out</button>
   `;
 }
@@ -762,8 +988,9 @@ function renderDashboard() {
     return;
   }
 
+  const units = currentUnits();
   const last30 = workoutsInLastDays(30);
-  const totalVolume = state.workouts.reduce((total, workout) => total + workoutVolume(workout), 0);
+  const totalVolume = allTimeVolume();
   const averageVolume = totalVolume / state.workouts.length;
   const lastWorkout = [...state.workouts].sort((a, b) => b.date.localeCompare(a.date))[0];
   const weeklyTarget = Math.round((last30.length / (30 / 7)) * 10) / 10;
@@ -782,7 +1009,7 @@ function renderDashboard() {
     <div class="grid grid--metrics">
       ${renderMetric("Total workouts", state.workouts.length, "All time")}
       ${renderMetric("Last 30 days", last30.length, `${weeklyTarget} workouts/week avg`)}
-      ${renderMetric("Total volume", currencyNumber(totalVolume), "lbs x reps")}
+      ${renderMetric("Total volume", displayWeightNumber(totalVolume, units), `${weightUnitLabel(units)} x reps`)}
       ${renderMetric("Current streak", calculateStreak(), "consecutive workout days")}
     </div>
 
@@ -794,12 +1021,12 @@ function renderDashboard() {
         <p class="muted">${formatDate(lastWorkout.date)} - ${escapeHtml(lastWorkout.routineName)}</p>
         <div class="workout-card__stats">
           <span class="pill">${completedSets(lastWorkout)} sets</span>
-          <span class="pill">${currencyNumber(workoutVolume(lastWorkout))} volume</span>
+          <span class="pill">${displayWeightNumber(workoutVolume(lastWorkout), units)} volume</span>
           <span class="pill">${lastWorkout.duration || "No"} min</span>
         </div>
         <hr />
         <p class="muted">Average session volume</p>
-        <h2>${currencyNumber(averageVolume)}</h2>
+        <h2>${displayWeightNumber(averageVolume, units)}</h2>
         <p class="muted">Keep the plan boring. Add reps, add weight, or repeat quality work.</p>
       </article>
     </div>
@@ -820,13 +1047,16 @@ function renderDashboard() {
 }
 
 function goalDeltaCopy(progress) {
+  const units = currentUnits();
+  const label = weightUnitLabel(units);
   if (progress.state === "none") return "Not logged yet";
   if (progress.state === "reached") return "Reached";
-  if (progress.state === "over") return `${currencyNumber(progress.delta)} lbs over`;
-  return `${currencyNumber(Math.abs(progress.delta))} lbs to go`;
+  if (progress.state === "over") return `${displayWeightNumber(progress.delta, units)} ${label} over`;
+  return `${displayWeightNumber(Math.abs(progress.delta), units)} ${label} to go`;
 }
 
 function renderGoalRow(progress) {
+  const units = currentUnits();
   const hasData = progress.current !== null;
   const percent = hasData
     ? Math.min((progress.current / Math.max(progress.target, 1)) * 100, 100)
@@ -837,7 +1067,7 @@ function renderGoalRow(progress) {
       <div class="goal-row__top">
         <strong>${escapeHtml(progress.name)}</strong>
         <span class="goal-row__weights">
-          ${hasData ? currencyNumber(progress.current) : "--"} &rarr; ${currencyNumber(progress.target)} lb
+          ${hasData ? displayWeightNumber(progress.current, units) : "--"} &rarr; ${displayWeightNumber(progress.target, units)} ${weightUnitLabel(units)}
         </span>
       </div>
       <div
@@ -860,6 +1090,7 @@ function renderGoalRow(progress) {
 }
 
 function renderGoalsCard() {
+  const goals = state.profile?.goals?.length ? state.profile.goals : STRENGTH_GOALS;
   return `
     <article class="card">
       <div class="section-header">
@@ -867,15 +1098,17 @@ function renderGoalsCard() {
           <h3>Goals</h3>
           <p>Your last working weight on each lift, against where you are headed.</p>
         </div>
+        <button class="button-secondary" data-action="go-profile">Edit goals</button>
       </div>
       <div class="goal-list">
-        ${STRENGTH_GOALS.map((goal) => renderGoalRow(goalProgress(goal))).join("")}
+        ${goals.map((goal) => renderGoalRow(goalProgress(goal))).join("")}
       </div>
     </article>
   `;
 }
 
 function renderProgressCard() {
+  const units = currentUnits();
   const exercises = getAllExerciseNames();
   const selected = exercises.includes(state.selectedExercise) ? state.selectedExercise : exercises[0];
   state.selectedExercise = selected;
@@ -903,7 +1136,7 @@ function renderProgressCard() {
           .join("")}
       </select>
       <div style="margin-top: 1rem;">
-        ${renderLineChart(sessions.map((session) => ({ label: formatDate(session.date), value: session.bestSet.e1rm })))}
+        ${renderLineChart(sessions.map((session) => ({ label: formatDate(session.date), value: toDisplayWeight(session.bestSet.e1rm, units) })))}
       </div>
       ${
         sessions.length > 1
@@ -933,12 +1166,12 @@ function renderLineChart(data) {
   const pointString = points.map((point) => `${point.x},${point.y}`).join(" ");
   return `
     <svg class="line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Exercise progress line chart">
-      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#e5d9c8" stroke-width="2" />
-      <polyline points="${pointString}" fill="none" stroke="#1f5f4a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" class="line-chart__axis" stroke-width="2" />
+      <polyline points="${pointString}" fill="none" class="line-chart__trend" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
       ${points
         .map(
           (point, index) => `
-            <circle cx="${point.x}" cy="${point.y}" r="5" fill="#c06c3a">
+            <circle cx="${point.x}" cy="${point.y}" r="5" class="line-chart__point">
               <title>${escapeHtml(point.label)}: ${currencyNumber(point.value)} e1RM</title>
             </circle>
             ${
@@ -972,6 +1205,8 @@ function renderLog() {
     return;
   }
 
+  const units = currentUnits();
+  const bodyweightPlaceholder = units === "kg" ? "90" : "198";
   const draft = loadDraft();
   if (draft.routineId && getRoutine(draft.routineId)?.id === draft.routineId) {
     state.selectedRoutineId = draft.routineId;
@@ -1012,8 +1247,8 @@ function renderLog() {
             <input id="duration" name="duration" type="number" min="1" max="240" placeholder="65" value="${escapeHtml(draft.duration || "")}" />
           </div>
           <div class="field">
-            <label for="bodyweight">Bodyweight</label>
-            <input id="bodyweight" name="bodyweight" type="number" min="1" step="0.1" placeholder="198" value="${escapeHtml(draft.bodyweight || "")}" />
+            <label for="bodyweight">Bodyweight (${weightUnitLabel(units)})</label>
+            <input id="bodyweight" name="bodyweight" type="number" min="1" step="0.1" placeholder="${bodyweightPlaceholder}" value="${escapeHtml(draft.bodyweight || "")}" />
           </div>
           <div class="field field--wide">
             <label for="notes">Notes</label>
@@ -1035,6 +1270,7 @@ function renderLog() {
 }
 
 function renderExerciseInputCard(exercise, exerciseIndex, draft = {}, lastExerciseLogs = new Map(), hasLastSession = false) {
+  const units = currentUnits();
   const weightName = `exercise-${exerciseIndex}-weight`;
   const setsName = `exercise-${exerciseIndex}-sets`;
   const repsName = `exercise-${exerciseIndex}-reps`;
@@ -1057,8 +1293,8 @@ function renderExerciseInputCard(exercise, exerciseIndex, draft = {}, lastExerci
       </div>
       <div class="exercise-log-fields">
         <div class="field">
-          <label for="${weightName}">Weight</label>
-          <input id="${weightName}" name="${weightName}" type="number" min="0" step="0.5" inputmode="decimal" placeholder="lbs" value="${escapeHtml(draft[weightName] || "")}" />
+          <label for="${weightName}">Weight (${weightUnitLabel(units)})</label>
+          <input id="${weightName}" name="${weightName}" type="number" min="0" step="0.5" inputmode="decimal" placeholder="${weightUnitLabel(units)}" value="${escapeHtml(draft[weightName] || "")}" />
         </div>
         <div class="field">
           <label for="${setsName}">Sets</label>
@@ -1074,6 +1310,7 @@ function renderExerciseInputCard(exercise, exerciseIndex, draft = {}, lastExerci
 }
 
 async function saveWorkout(form) {
+  const units = currentUnits();
   const formData = new FormData(form);
   const selectedRoutine = getRoutine(formData.get("routineId"));
   if (!selectedRoutine) {
@@ -1085,7 +1322,7 @@ async function saveWorkout(form) {
     .map((exercise, exerciseIndex) => {
       const setCount = Number(formData.get(`exercise-${exerciseIndex}-sets`) || 0);
       const reps = Number(formData.get(`exercise-${exerciseIndex}-reps`) || 0);
-      const weight = Number(formData.get(`exercise-${exerciseIndex}-weight`) || 0);
+      const weight = fromDisplayWeight(formData.get(`exercise-${exerciseIndex}-weight`), units);
 
       if (setCount <= 0 && reps <= 0 && weight <= 0) {
         return { name: exercise.name, group: exercise.group, sets: [] };
@@ -1116,7 +1353,7 @@ async function saveWorkout(form) {
     routineId: selectedRoutine.id,
     routineName: `${selectedRoutine.day} - ${selectedRoutine.name}`,
     duration: Number(formData.get("duration") || 0),
-    bodyweight: Number(formData.get("bodyweight") || 0),
+    bodyweight: fromDisplayWeight(formData.get("bodyweight"), units),
     notes: String(formData.get("notes") || "").trim(),
     exercises,
   };
@@ -1295,6 +1532,8 @@ function renderHistory() {
 }
 
 function renderWorkoutCard(workout) {
+  const units = currentUnits();
+  const label = weightUnitLabel(units);
   return `
     <article class="workout-card">
       <div class="workout-card__top">
@@ -1306,9 +1545,9 @@ function renderWorkoutCard(workout) {
       </div>
       <div class="workout-card__stats">
         <span class="pill">${completedSets(workout)} sets</span>
-        <span class="pill">${currencyNumber(workoutVolume(workout))} volume</span>
+        <span class="pill">${displayWeightNumber(workoutVolume(workout), units)} volume</span>
         <span class="pill">${workout.duration || "No"} min</span>
-        ${workout.bodyweight ? `<span class="pill">${workout.bodyweight} lb bodyweight</span>` : ""}
+        ${workout.bodyweight ? `<span class="pill">${displayWeightNumber(workout.bodyweight, units)} ${label} bodyweight</span>` : ""}
       </div>
       <table class="mini-table">
         <thead>
@@ -1335,8 +1574,8 @@ function renderWorkoutCard(workout) {
               return `
                 <tr>
                   <td>${escapeHtml(exercise.name)}</td>
-                  <td>${bestSet.weight} x ${bestSet.reps}</td>
-                  <td>${currencyNumber(volume)}</td>
+                  <td>${displayWeightNumber(bestSet.weight, units)} ${label} x ${bestSet.reps}</td>
+                  <td>${displayWeightNumber(volume, units)}</td>
                 </tr>
               `;
             })
@@ -1347,7 +1586,115 @@ function renderWorkoutCard(workout) {
   `;
 }
 
+function renderProfile() {
+  const profile = state.profile || defaultProfile();
+  const units = currentUnits();
+  const unitLabel = weightUnitLabel(units);
+  const email = state.session?.user?.email || "";
+  const memberSince = state.session?.user?.created_at
+    ? formatDate(String(state.session.user.created_at).slice(0, 10))
+    : "Unknown";
+
+  app.innerHTML = `
+    <div class="section-header">
+      <div>
+        <h2>Profile</h2>
+        <p>Your account, how the app displays weight and theme, and the goals the Dashboard tracks.</p>
+      </div>
+    </div>
+
+    ${state.profileMessage ? renderMessage(state.profileMessage, "error") : ""}
+
+    <div class="grid grid--two">
+      <article class="card">
+        <h3>Account</h3>
+        <div class="profile-identity">
+          ${renderAvatar(profile, "lg")}
+          <div class="field field--wide">
+            <label for="avatar-file">Profile photo</label>
+            <input id="avatar-file" type="file" accept="image/*" data-action="avatar-file-input" ${state.avatarUploading ? "disabled" : ""} />
+            <span class="form-help">${state.avatarUploading ? "Uploading..." : "JPG or PNG, up to 5MB."}</span>
+          </div>
+        </div>
+        <div class="form-grid" style="margin-top: 1rem;">
+          <div class="field field--wide">
+            <label for="profile-display-name">Display name</label>
+            <input id="profile-display-name" type="text" placeholder="${escapeHtml(email)}"
+              value="${escapeHtml(profile.displayName)}" data-action="profile-field" data-field="displayName" />
+          </div>
+          <div class="field field--wide">
+            <label>Email</label>
+            <input type="text" value="${escapeHtml(email)}" disabled />
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h3>Customize</h3>
+        <div class="field" style="margin-top: 0.5rem;">
+          <label for="profile-units">Units</label>
+          <select id="profile-units" data-action="profile-field" data-field="units">
+            <option value="lb" ${units === "lb" ? "selected" : ""}>Pounds (lb)</option>
+            <option value="kg" ${units === "kg" ? "selected" : ""}>Kilograms (kg)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top: 0.8rem;">
+          <label for="profile-theme">Theme</label>
+          <select id="profile-theme" data-action="profile-field" data-field="theme">
+            <option value="light" ${profile.theme === "light" ? "selected" : ""}>Light</option>
+            <option value="dark" ${profile.theme === "dark" ? "selected" : ""}>Dark</option>
+          </select>
+        </div>
+      </article>
+    </div>
+
+    <div class="grid grid--metrics" style="margin-top: 1rem;">
+      ${renderMetric("Member since", memberSince, "")}
+      ${renderMetric("Total workouts", state.workouts.length, "All time")}
+      ${renderMetric("Current streak", calculateStreak(), "consecutive workout days")}
+      ${renderMetric("All-time volume", displayWeightNumber(allTimeVolume(), units), `${unitLabel} x reps`)}
+    </div>
+
+    <article class="card" style="margin-top: 1rem;">
+      <div class="section-header">
+        <div>
+          <h3>Goals</h3>
+          <p>Edit the lifts the Dashboard Goals card tracks. Changes save automatically.</p>
+        </div>
+        <button class="button-secondary" data-action="profile-add-goal">Add goal</button>
+      </div>
+      ${
+        profile.goals.length
+          ? `<table class="builder-exercises">
+        <thead>
+          <tr><th>Name</th><th>Target (${unitLabel})</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${profile.goals
+            .map(
+              (goal, index) => `
+            <tr>
+              <td><input type="text" value="${escapeHtml(goal.name)}" placeholder="Exercise name"
+                data-action="profile-goal-field" data-goal-index="${index}" data-field="name" /></td>
+              <td><input type="number" min="0" step="1" value="${displayWeightValue(goal.target, units)}"
+                data-action="profile-goal-field" data-goal-index="${index}" data-field="target" /></td>
+              <td class="builder-exercise__controls">
+                <button class="icon-button icon-button--danger" data-action="profile-delete-goal" data-goal-index="${index}" title="Remove goal">&times;</button>
+              </td>
+            </tr>
+          `,
+            )
+            .join("")}
+        </tbody>
+      </table>`
+          : `<p class="muted">No goals yet. Add one above.</p>`
+      }
+    </article>
+  `;
+}
+
 function render() {
+  applyTheme();
   const locked = !supabaseClient || state.isLoading || !isSignedIn();
   tabsNav.classList.toggle("is-locked", locked);
   tabs.forEach((tab) => {
@@ -1376,6 +1723,7 @@ function render() {
   if (state.activeTab === "routine") renderRoutine();
   if (state.activeTab === "builder") renderBuilder();
   if (state.activeTab === "history") renderHistory();
+  if (state.activeTab === "profile") renderProfile();
 }
 
 document.addEventListener("click", async (event) => {
@@ -1401,6 +1749,10 @@ document.addEventListener("click", async (event) => {
 
   if (action === "go-builder") {
     setTab("builder");
+  }
+
+  if (action === "go-profile") {
+    setTab("profile");
   }
 
   if (action === "builder-add-day") {
@@ -1503,6 +1855,17 @@ document.addEventListener("click", async (event) => {
     state.workouts = [];
     render();
   }
+
+  if (action === "profile-add-goal") {
+    state.profile.goals.push({ name: "New Goal", target: 0 });
+    await commitProfileChange();
+  }
+
+  if (action === "profile-delete-goal") {
+    const index = Number(actionTarget.dataset.goalIndex);
+    state.profile.goals.splice(index, 1);
+    await commitProfileChange();
+  }
 });
 
 document.addEventListener("change", (event) => {
@@ -1543,6 +1906,37 @@ document.addEventListener("change", (event) => {
       exercise[field] = target.value;
     }
     saveRoutine();
+  }
+
+  if (target.matches("[data-action='profile-field']")) {
+    if (!state.profile) return;
+    const field = target.dataset.field;
+    if (field === "displayName") {
+      state.profile.displayName = target.value;
+    } else if (field === "units") {
+      state.profile.units = target.value === "kg" ? "kg" : "lb";
+    } else if (field === "theme") {
+      state.profile.theme = target.value === "dark" ? "dark" : "light";
+      saveState();
+    }
+    commitProfileChange();
+  }
+
+  if (target.matches("[data-action='profile-goal-field']")) {
+    if (!state.profile) return;
+    const goal = state.profile.goals[Number(target.dataset.goalIndex)];
+    if (!goal) return;
+    const field = target.dataset.field;
+    if (field === "target") {
+      goal.target = fromDisplayWeight(target.value, currentUnits());
+    } else {
+      goal.name = target.value;
+    }
+    commitProfileChange();
+  }
+
+  if (target.matches("[data-action='avatar-file-input']")) {
+    handleAvatarFileChange(target.files[0]);
   }
 });
 
@@ -1586,6 +1980,7 @@ async function initApp() {
     state.session = session;
     state.authMessage = "";
     state.workouts = [];
+    state.profile = null;
 
     if (session) {
       await loadWorkouts();

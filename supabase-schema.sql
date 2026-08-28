@@ -107,3 +107,86 @@ create trigger set_routines_updated_at
   before update on public.routines
   for each row
   execute function public.set_updated_at();
+
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users (id) on delete cascade default auth.uid(),
+  display_name text,
+  units text not null default 'lb' check (units in ('lb', 'kg')),
+  theme text not null default 'light' check (theme in ('light', 'dark')),
+  avatar_url text,
+  goals jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+
+grant select, insert, update, delete on public.profiles to authenticated;
+
+drop policy if exists "Users can view their own profile" on public.profiles;
+drop policy if exists "Users can insert their own profile" on public.profiles;
+drop policy if exists "Users can update their own profile" on public.profiles;
+
+create policy "Users can view their own profile"
+  on public.profiles
+  for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own profile"
+  on public.profiles
+  for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own profile"
+  on public.profiles
+  for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop trigger if exists set_profiles_updated_at on public.profiles;
+
+create trigger set_profiles_updated_at
+  before update on public.profiles
+  for each row
+  execute function public.set_updated_at();
+
+-- Avatar photos. Public bucket: URLs are guessable-only-if-known, not
+-- listable/browsable. Own-folder-only write, enforced by the {user_id}/...
+-- path convention below.
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Avatar images are publicly readable" on storage.objects;
+drop policy if exists "Users can upload their own avatar" on storage.objects;
+drop policy if exists "Users can update their own avatar" on storage.objects;
+drop policy if exists "Users can delete their own avatar" on storage.objects;
+
+create policy "Avatar images are publicly readable"
+  on storage.objects
+  for select
+  using (bucket_id = 'avatars');
+
+create policy "Users can upload their own avatar"
+  on storage.objects
+  for insert
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "Users can update their own avatar"
+  on storage.objects
+  for update
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "Users can delete their own avatar"
+  on storage.objects
+  for delete
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
