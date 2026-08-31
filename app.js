@@ -385,6 +385,32 @@ function completedSets(workout) {
   }, 0);
 }
 
+// Reps can be entered as one number ("8") or as a per-set list ("8,6,5" or
+// "8/6/5"). The list exists because a hard set almost never repeats exactly:
+// logging 225 for "3 sets of 8" when the sets really went 8/6/5 used to record
+// three identical sets and overstate volume by 26%, always in the same
+// direction, on a number the dashboard tells you to watch.
+// Returns [] for empty/garbage input so callers can treat that as "not logged".
+function parseRepsInput(value) {
+  return String(value ?? "")
+    .split(/[,/]/)
+    .map((part) => Number(String(part).trim()))
+    .filter((reps) => Number.isFinite(reps) && reps > 0);
+}
+
+// A per-set list is the more specific statement, so it wins and setCount is
+// ignored. A single rep value keeps the original fast path exactly: setCount
+// identical sets, defaulting to one.
+function buildSetsFromInput(weight, setCount, repsList) {
+  if (repsList.length > 1) {
+    return repsList.map((reps) => ({ weight, reps }));
+  }
+
+  const reps = repsList[0] || 0;
+  const count = setCount > 0 ? setCount : 1;
+  return Array.from({ length: count }, () => ({ weight, reps }));
+}
+
 function workoutVolume(workout) {
   return workout.exercises.reduce((total, exercise) => {
     return (
@@ -1262,7 +1288,7 @@ function renderLog() {
       </div>
 
       <div class="form-actions">
-        <p class="form-help">Tip: enter once per exercise. If every set was the same, one row is enough.</p>
+        <p class="form-help">Tip: if every set was the same, fill in Sets and Reps once. If they weren't, put each set's reps in the Reps field &mdash; 8,6,5 &mdash; and it logs three real sets instead of three identical ones.</p>
         <button class="button" type="submit">Save workout</button>
       </div>
     </form>
@@ -1302,7 +1328,7 @@ function renderExerciseInputCard(exercise, exerciseIndex, draft = {}, lastExerci
         </div>
         <div class="field">
           <label for="${repsName}">Reps</label>
-          <input id="${repsName}" name="${repsName}" type="number" min="0" step="1" inputmode="numeric" placeholder="${escapeHtml(exercise.reps)}" value="${escapeHtml(draft[repsName] || "")}" />
+          <input id="${repsName}" name="${repsName}" type="text" inputmode="decimal" autocomplete="off" placeholder="${escapeHtml(exercise.reps)} or 8,6,5" value="${escapeHtml(draft[repsName] || "")}" />
         </div>
       </div>
     </article>
@@ -1321,7 +1347,8 @@ async function saveWorkout(form) {
   const exercises = selectedRoutine.exercises
     .map((exercise, exerciseIndex) => {
       const setCount = Number(formData.get(`exercise-${exerciseIndex}-sets`) || 0);
-      const reps = Number(formData.get(`exercise-${exerciseIndex}-reps`) || 0);
+      const repsList = parseRepsInput(formData.get(`exercise-${exerciseIndex}-reps`));
+      const reps = repsList[0] || 0;
       const weight = fromDisplayWeight(formData.get(`exercise-${exerciseIndex}-weight`), units);
 
       if (setCount <= 0 && reps <= 0 && weight <= 0) {
@@ -1332,8 +1359,7 @@ async function saveWorkout(form) {
         return { name: exercise.name, group: exercise.group, sets: [] };
       }
 
-      const completedSets = setCount > 0 ? setCount : 1;
-      const sets = Array.from({ length: completedSets }, () => ({ weight, reps }));
+      const sets = buildSetsFromInput(weight, setCount, repsList);
 
       return { name: exercise.name, group: exercise.group, sets };
     })
